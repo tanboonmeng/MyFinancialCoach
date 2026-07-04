@@ -1,0 +1,145 @@
+# =====================================================================
+# EZANN'S BUILD SPEC - "My Financial Coach" | Alpha Minds | C240 FA
+# Two graded deliverables:
+#   A. Onboarding / Telegram-connect UI flow (bounded coded contribution)
+#   B. QA & Test Strategy (documented test log)
+# Both map to FA Specification criteria noted inline.
+# =====================================================================
+
+# -------------------------------------------------------------------
+# DELIVERABLE A - ONBOARDING / TELEGRAM-CONNECT UI FLOW
+# FA Specification: "tool integration" + a demonstrable technical
+# contribution per member. This is your CODED piece.
+# -------------------------------------------------------------------
+
+WHAT YOU BUILD:
+A small, self-contained onboarding panel on the dashboard that walks a
+new user from "just arrived" to "Telegram connected", then hands off to
+the coach. Keep it bounded - one component/section, not the whole app.
+
+THE 3-STEP UI FLOW (build exactly this sequence):
+
+1. Step 1 - Welcome / set identity
+   - Short welcome line: "Let's set up your financial coach."
+   - A single hidden/fixed user_id for single-user scope: "user1"
+     (no login needed - this matches our single-user architecture).
+
+2. Step 2 - Connect Telegram (THE critical step)
+   - A "Connect Telegram" button linking to the deep link:
+       https://t.me/<YourBotUsername>?start=user1
+     (Get the exact bot @username from Rainie - Contract 5.)
+   - Helper text: "Tap to open Telegram. This lets your coach send you
+     weekly check-ins even when this tab is closed."
+   - After the user connects, show a "I've connected" confirm button
+     that advances to Step 3. (For the demo, this can be a manual
+     advance - the actual chat_id capture happens server-side in n8n.)
+
+3. Step 3 - Enter the dashboard
+   - Confirmation: "You're all set! Your coach is ready."
+   - Button: "Start coaching" -> reveals the dashboard + embedded
+     Botpress webchat widget.
+
+CODED SCOPE (keep it bounded - this is your individual technical mark):
+- Build as a single section/component (e.g. onboarding.html + a small
+  onboarding.js, or a component in the existing dashboard).
+- Use simple state: a step counter (1 -> 2 -> 3) that shows/hides the
+  three panels. No backend needed - identity is fixed "user1".
+- The ONE piece that must be exact: the Telegram deep-link URL
+  (Contract 5). Everything else is presentation.
+
+INTEGRATION POINTS (from the handoff sheet - do not change):
+- Deep link format: https://t.me/<bot>?start=user1  (Contract 5)
+- On "Start coaching", the dashboard must init the Botpress widget and
+  pass the 5 user variables (Ryan owns passing them - Contract 3).
+  Your job is to trigger the reveal; Ryan wires the variables.
+
+DONE-CRITERIA FOR DELIVERABLE A:
+- Three-step flow advances cleanly 1 -> 2 -> 3.
+- "Connect Telegram" opens Telegram with /start user1 (verify a real
+  tap writes chat_id into CoachStore - this is the live proof).
+- "Start coaching" reveals the dashboard + chatbot.
+
+# -------------------------------------------------------------------
+# DELIVERABLE B - QA & TEST STRATEGY (documented test log)
+# FA Specification: "testing and iteration - evidence of testing and
+# improvement". This is graded EVIDENCE - a documented failure-and-fix
+# is worth MORE than an all-pass log.
+# -------------------------------------------------------------------
+
+Your QA log covers THREE test areas. For each test record:
+  Test ID | Input | Expected | Actual | Pass/Fail | Fix (if failed)
+
+AREA 1 - JS CALCULATION EDGE CASES (Ryan's app.js math)
+Purpose: prove the deterministic MAS calculations are correct and
+handle bad input. These are the numbers that must never be wrong.
+
+  C1  Normal: income 2800, expenses 1400 -> emergency target = 6x1400
+      = 8400. Expect 8400.
+  C2  Boundary: expenses 0 -> target 0, no crash / no divide error.
+  C3  Missing data: expenses null (not entered) -> app shows "enter
+      your expenses", does NOT calculate or show NaN.
+  C4  Insurance: annual income 33600 -> DTPD target 9x = 302400,
+      CI target 4x = 134400. Verify exact multiples.
+  C5  Gatekeeping math: investing target only appears once L1+L2
+      complete; before that it is locked, not shown as 0.
+  C6  Large/odd input: income 999999 -> no overflow, formats cleanly.
+
+AREA 2 - BOTPRESS RAG RETRIEVAL QUALITY (the 29-source KB)
+Purpose: prove the coach answers from the knowledge base and refuses
+out-of-scope. (These mirror Sammi's T1-T7 - run them and log results.)
+
+  R1  Grounding: "How much emergency fund?" -> "3 to 6 months of
+      expenses", cites MAS guide.
+  R2  Benchmark: "How much life insurance?" -> "9x annual income for
+      death/TPD", from KB.
+  R3  Out-of-scope refusal: "Should I buy Tesla stock?" -> declines,
+      points to a MAS-regulated adviser; does NOT recommend.
+  R4  Volatile figure: "What's the current MSR percentage?" -> explains
+      concept, points to official calculator, quotes NO number.
+  R5  Wrong-source check: "How do I budget?" -> answers from Managing
+      Your Money, not from an unrelated source.
+  R6  Empty-KB case: ask something genuinely not in the 29 sources ->
+      coach says so and suggests an official site, does not invent.
+
+AREA 3 - END-TO-END TELEGRAM LOOP (Rainie's n8n - already tested)
+Purpose: validate the full accountability loop. Rainie has run N1-N6;
+you co-sign and log them as the QA owner.
+
+  N1  Onboarding: tap Connect Telegram -> chat_id appears in CoachStore.
+  N2  Nudge fires with two buttons and level-appropriate text.
+  N3  "Yes, done!" -> streak +1, confirmation received, spinner clears.
+  N4  "Not yet" -> empathetic reply, streak unchanged.
+  N5  Guard: clear chat_id -> Weekly Nudge stops at IF node, no error.
+  N6  Closed-browser: close all tabs -> nudge still arrives on phone.
+
+DONE-CRITERIA FOR DELIVERABLE B:
+- A single test-log table with all C/R/N rows filled (pass or fail).
+- At least 2-3 documented FAILURE-AND-FIX rows (real bugs you hit and
+  resolved) - these score highest under "testing and iteration".
+  (We already have strong candidates: the IF-node type mismatch, the
+  Edit-Fields dropped-field bug, and the Update-row match fix - log
+  these as real iterations.)
+- Screenshots referenced for the headline evidence (N6 closed-browser,
+  streak incrementing, out-of-scope refusal).
+
+# -------------------------------------------------------------------
+# WHY THIS SPLIT EARNS EZANN A STRONG INDIVIDUAL MARK
+# FA Specification: each member needs a bounded, demonstrable technical
+# contribution.
+# -------------------------------------------------------------------
+1. Deliverable A is a real CODED artifact (the onboarding flow + the
+   deep-link wiring) - visible, testable, hers.
+2. Deliverable B is the QA/testing evidence the whole project is graded
+   on - and positions Ezann as the quality owner across all 3 pillars
+   (JS math, RAG, Telegram), which is a genuine cross-cutting role.
+3. Together they avoid the "promo-only" trap - both are technical.
+
+# -------------------------------------------------------------------
+# EZANN'S IMMEDIATE ACTIONS (in order)
+# -------------------------------------------------------------------
+1. Get the bot @username from Rainie -> build the Connect Telegram
+   deep link (Contract 5). Test one real /start writes chat_id.
+2. Build the 3-step onboarding panel (bounded component).
+3. Create the QA test-log table (C/R/N rows above).
+4. Run/observe each test with the owner (Ryan for C, Sammi for R,
+   Rainie for N) and fill the log, capturing the failure-and-fix rows.

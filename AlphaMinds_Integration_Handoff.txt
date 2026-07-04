@@ -1,0 +1,130 @@
+# =====================================================================
+# ALPHA MINDS - INTEGRATION HANDOFF SHEET
+# "My Financial Coach" | C240 FA
+# Purpose: the exact contracts that connect the 4 pillars so they
+# integrate cleanly on 7 Jul. Every value here is FINAL - do not
+# change a key/name without agreement from BOTH owners listed.
+# =====================================================================
+
+# THE 4 PILLARS AND OWNERS
+1. Botpress coach (RAG chat)        - Sammi
+2. Gemini extractor (numbers->JSON) - Sammi (prompt) / Ryan (consumes)
+3. app.js (calculations + UI state) - Ryan
+4. n8n + Telegram + Google Sheets   - Rainie (BUILT & TESTED)
+5. Onboarding / dashboard UI        - Ezann
+
+# =====================================================================
+# CONTRACT 1 - THE GOOGLE SHEET (server-side store)
+# Owner: Rainie | Consumed by: Ryan (via Workflow C webhook)
+# =====================================================================
+Spreadsheet: CoachStore | Tab: users | One row per user.
+Exact column headers (DO NOT rename):
+  user_id | chat_id | current_level | streak | last_checkin
+
+- n8n reads/writes this sheet. If Ryan's app needs to update
+  current_level, it calls the Workflow C webhook (Contract 4), it does
+  NOT write to the sheet directly.
+- Status: LIVE and tested (streak increments confirmed).
+
+# =====================================================================
+# CONTRACT 2 - GEMINI EXTRACTION JSON SCHEMA
+# Owner: Sammi (prompt) | Consumed by: Ryan (app.js parses this)
+# =====================================================================
+Gemini returns EXACTLY this object, all 9 keys always present:
+{
+  "monthly_take_home_income": number | null,
+  "monthly_expenses": number | null,
+  "current_savings": number | null,
+  "monthly_insurance_premium": number | null,
+  "dtpd_coverage_amount": number | null,
+  "critical_illness_coverage_amount": number | null,
+  "monthly_investment_amount": number | null,
+  "ambiguous": true | false,
+  "ambiguity_note": string | null
+}
+
+Ryan's rules when consuming:
+- Wrap JSON.parse() in try/catch (Gemini output is text).
+- NEVER calculate on a null field - treat null as "not provided yet".
+- If ambiguous == true, have the coach ask a clarifying question
+  instead of calculating (e.g. yearly income given -> ask for monthly).
+
+# =====================================================================
+# CONTRACT 3 - BOTPRESS USER VARIABLES (dashboard -> coach)
+# Owner: Ryan (sets them) | Consumed by: Sammi's coach prompt (reads them)
+# =====================================================================
+Ryan's app.js must pass these into the Botpress webchat widget on
+init AND on every recalculation. The coach prompt (v3) reads them:
+
+  user.currentLevel        (number: 1-4)   - gatekeeping
+  user.emergencyTarget     (number, SGD)   - dashboard explain
+  user.currentSavings      (number, SGD)   - dashboard explain
+  user.savingsProgress     (string/number, e.g. "59%") - dashboard explain
+  user.insuranceTarget     (number, SGD)   - dashboard explain
+
+- If these are empty, the coach says "your dashboard will show it once
+  your numbers are entered" (already handled in prompt v3).
+- currentLevel is the #1 dependency: without it, gatekeeping resolves
+  empty and the coach can't enforce the level sequence.
+
+# =====================================================================
+# CONTRACT 4 - WORKFLOW C WEBHOOK (app.js -> n8n, level sync)
+# Owner: Rainie (builds endpoint) | Called by: Ryan (app.js)
+# =====================================================================
+When the user levels up, app.js POSTs to the n8n Webhook node:
+  POST <n8n Workflow C webhook URL>
+  Body: { "user_id": "user1", "current_level": 2 }
+
+- n8n updates current_level in the sheet, so the NEXT weekly nudge
+  talks about the user's current level automatically.
+- If Workflow C is cut for time: Rainie updates the sheet manually for
+  the demo, and the team notes this as a scoping decision in the report.
+
+# =====================================================================
+# CONTRACT 5 - THE ONBOARDING DEEP LINK (Ezann's UI -> n8n)
+# Owner: Ezann | Depends on: Rainie's bot (LIVE)
+# =====================================================================
+Ezann's dashboard shows a "Connect Telegram" button linking to:
+  https://t.me/<YourBotUsername>?start=user1
+
+- Tapping it opens Telegram and sends "/start user1" to the bot.
+- This fires Workflow A's onboarding branch, which captures chat_id
+  into the sheet. THIS IS THE #1 SPRINT DEPENDENCY - without it, no
+  nudge can ever reach a user.
+- Ezann: get the exact bot @username from Rainie.
+
+# =====================================================================
+# THE EXTRACTION CALL LOCATION (locked decision)
+# =====================================================================
+The Gemini extraction call runs INSIDE Botpress (not n8n) - the user's
+message already lives there, so extraction there = fewer hops, fewer
+failure points. (Diagram: user -> Botpress -> [coach reply + Gemini
+extract] -> app.js calculates -> dashboard.)
+
+# =====================================================================
+# 7 JUL INTEGRATION-DAY CHECKLIST (do in this order)
+# =====================================================================
+1. Ezann: add the "Connect Telegram" deep-link button (Contract 5),
+   test a real /start -> confirm chat_id lands in CoachStore.
+2. Ryan: pass the 5 Botpress user variables on widget init (Contract 3)
+   -> confirm coach answers "how close am I to my target?" by reading
+   them (coach prompt v3 test T8).
+3. Sammi + Ryan: lock the 9-field JSON schema (Contract 2) -> Ryan
+   codes app.js parsing against exact key names.
+4. Ryan: wire the Workflow C level-sync POST (Contract 4) OR agree
+   manual sheet update for demo.
+5. Full end-to-end dry run: enter numbers in chat -> extraction ->
+   JS calculates -> dashboard updates -> level up -> nudge reflects
+   new level.
+
+# =====================================================================
+# WHAT IS ALREADY DONE (no action needed)
+# =====================================================================
+- 29-source RAG knowledge base (cleaned .txt + MAS PDF) - Sammi to upload
+- Coach system instructions v3 (grounding, MAS benchmarks, arithmetic,
+  dashboard-read, privacy, distress, gatekeeping, boundaries)
+- Gemini extraction prompt v1
+- Sammi's deployment copilot prompt
+- n8n: Telegram Inbound + Weekly Nudge workflows, BUILT & TESTED
+  (N1-N6 acceptance log: onboarding, nudge, yes-tap, no-tap,
+  closed-browser proof all passing; guard test N5 to confirm)

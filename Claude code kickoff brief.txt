@@ -1,0 +1,104 @@
+# =====================================================================
+# CLAUDE CODE KICKOFF BRIEF - paste this ENTIRE text as your FIRST
+# message in Claude Code (VS Code). Attach these 3 files to the project
+# folder first so Claude Code can read them:
+#   1. AlphaMinds_Integration_Handoff.txt  (the 5 integration contracts)
+#   2. Ezann_Build_Spec.txt                (onboarding section spec)
+#   3. Coach_System_Instructions_v3.txt    (what the chatbot does)
+# =====================================================================
+
+You are my senior full-stack web developer. Build the branded website
+for our graded school project. Read the 3 attached .txt files first -
+they define the integration contracts, the onboarding section spec,
+and the chatbot's behaviour. Work step by step and confirm each phase
+before moving on.
+
+## PRODUCT CONTEXT (do not re-ask; this is final)
+- Product: "My Financial Coach" by Team Alpha Minds - a gamified
+  financial-coaching web app for young Singaporeans (aged 19-29)
+  entering the workforce, grounded in the official MAS Basic Financial
+  Planning Guide benchmarks.
+- Core journey: a strict, sequential 4-level path -
+  Level 1 Emergency Fund & Money Management -> Level 2 Insurance
+  Protection -> Level 3 Investing -> Level 4 Home & Retirement.
+  Users must complete each level before the next unlocks.
+- Already built (do NOT rebuild): a Botpress RAG chatbot (29 official
+  sources), a Gemini number-extraction layer, and a working n8n +
+  Telegram weekly accountability loop with streak tracking. The website
+  EMBEDS these; it does not reimplement them.
+
+## THE DELIVERABLE (graded requirements - treat as acceptance criteria)
+Our assessment guide requires: "a branded website with real depth,
+whether multi-page or a well-sectioned single page... responsive layout
+that works on both desktop and mobile... interactive elements where
+they add value. Embedding your Botpress flow in the site is a good
+option... clear branding: name, logo, colours, and tone." Grade bar:
+"an A-level site is a polished, clearly branded site that responds
+well on any device and offers genuine interactivity."
+
+## TECH CONSTRAINTS
+1. Vanilla HTML + CSS (Tailwind via CDN is allowed) + vanilla JS.
+   NO build step, NO framework - it must deploy as static files on
+   GitHub Pages.
+2. One well-sectioned single-page site (index.html) with a sticky nav
+   whose links scroll to sections. Separate style.css and site.js files.
+3. Must be responsive (mobile-first; test at 375px and 1280px).
+4. A teammate (Ryan) will later add app.js with the MAS calculation
+   logic - leave a clean mount point and do not write financial
+   calculation code yourself.
+
+## SITE STRUCTURE (build exactly these sections, in order)
+1. HERO - product name, one-line promise ("Your first paycheck to your
+   first home - one level at a time"), CTA button "Start your journey"
+   scrolling to the onboarding section.
+2. PROBLEM & AUDIENCE - short section: young workers know the theory
+   but lack a practical kickstart; we translate MAS guidelines into a
+   step-by-step coach. Keep copy tight.
+3. THE 4-LEVEL JOURNEY - the centrepiece. Four cards in a sequential
+   visual path (1->2->3->4) with locked/unlocked styling (levels 2-4
+   visually locked). Each card: level number, title, one-line
+   description, a small "MAS benchmark" chip (L1: "3-6 months of
+   expenses", L2: "9x / 4x annual income cover", L3: ">=10% of
+   take-home pay", L4: "Plan with official calculators").
+4. COACH CHAT - an embedded Botpress webchat container. Use a clearly
+   marked placeholder <script> block with a comment: "SAMMI: paste
+   Botpress embed snippet here". Style the surrounding section so the
+   chat looks native to the page.
+5. ONBOARDING / CONNECT TELEGRAM - build to Ezann_Build_Spec.txt:
+   a 3-step panel (Welcome -> Connect Telegram -> Enter dashboard).
+   The Connect Telegram button links to
+   https://t.me/BOT_USERNAME_PLACEHOLDER?start=user1
+   with a comment: "EZANN: replace with real bot username from Rainie".
+   Include the helper text from the spec about nudges working even
+   when the tab is closed.
+6. HOW IT WORKS (architecture strip) - four simple icons/steps:
+   "Chat naturally -> AI extracts your numbers -> Our code calculates
+   your MAS targets -> Telegram keeps you accountable". One line each.
+7. FOOTER - team name, module code, a disclaimer line: "Educational
+   coaching grounded in published MAS benchmarks - not regulated
+   financial advice", and links to moneysense.gov.sg and the MAS guide.
+
+## BRANDING DIRECTION
+1. Name on site: My Financial Coach. Team credit: Alpha Minds.
+2. Tone: encouraging, plain-English, zero jargon - like a supportive
+   coach, not a bank.
+3. Colours: a trustworthy green/teal primary (financial growth) with a
+   warm accent for CTAs; light background; strong contrast for
+   accessibility. Define them as CSS variables in :root.
+4. Simple text/geometric logo is fine (no external assets needed).
+5. Sentence case everywhere; friendly microcopy.
+
+## WORKING METHOD (follow strictly)
+1. Phase 1: git init, scaffold index.html / style.css / site.js,
+   build HERO + nav + section skeletons. STOP and show me.
+2. Phase 2: build sections 2-3 (problem + 4-level journey with
+   locked/unlocked styling). STOP and show me.
+3. Phase 3: build sections 4-5 (chat embed placeholder + onboarding
+   per the spec). STOP and show me.
+4. Phase 4: sections 6-7, responsive pass at 375px/1280px, and a
+   GitHub Pages deploy checklist (repo push + Pages settings).
+5. Commit at the end of every phase with a clear message.
+6. Never invent financial figures beyond the four MAS benchmark chips
+   listed above. Never add features outside this brief without asking.
+
+Start with Phase 1 now.
