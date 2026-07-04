@@ -226,7 +226,65 @@
       <div class="mx-auto max-w-6xl px-5">
         <p class="eyebrow">Coach chat</p>
         <h2 class="section-title">Ask your coach anything about the basics</h2>
-        <p class="section-placeholder"><!-- Phase 3: Botpress webchat embed --></p>
+
+        <div class="grid md:grid-cols-2 gap-8 md:gap-10 coach-grid">
+
+          <div class="coach-intro">
+            <p class="coach-lead">Your coach is a chatbot grounded only in official sources — the MAS Basic Financial Planning Guide, MoneySense articles, and HDB home-financing pages. Ask in plain English; it answers from the guide and points you to the right official tool when a figure changes.</p>
+            <ul class="coach-points">
+              <li>Grounded in 29 official MoneySense &amp; MAS sources — and it always cites them</li>
+              <li>Explains your dashboard targets in plain English, never re-does the math</li>
+              <li>Won't recommend products or stocks — it points you to a licensed adviser</li>
+              <li>Only asks for the basics — never your NRIC, bank details, or passwords</li>
+            </ul>
+            <button class="btn btn-accent" type="button" data-open-coach>Chat with your coach</button>
+          </div>
+
+          <!-- Native-styled chat window. Shows a sample conversation until the
+               live Botpress webchat is connected (see placeholder below). -->
+          <div class="coach-window" role="group" aria-label="Coach chat preview">
+            <div class="coach-window-head">
+              <span class="coach-avatar" aria-hidden="true">
+                <svg viewBox="0 0 32 32"><rect x="4" y="18" width="4" height="8" rx="1.2"/><rect x="11" y="14" width="4" height="12" rx="1.2"/><rect x="18" y="10" width="4" height="16" rx="1.2"/><rect x="25" y="6" width="4" height="20" rx="1.2"/></svg>
+              </span>
+              <span class="coach-id">
+                <span class="coach-name">My Financial Coach</span>
+                <span class="coach-status"><span class="status-dot"></span>Grounded in MAS guidance</span>
+              </span>
+              <span class="coach-preview-badge">Preview</span>
+            </div>
+
+            <div class="coach-window-body">
+              <p class="msg msg-bot">Hi! I'm your financial coach. Let's start with Level 1 — roughly how much do you take home each month?</p>
+              <p class="msg msg-user">About $2,800.</p>
+              <p class="msg msg-bot">Got it — $2,800 take-home each month. And what are your monthly expenses?</p>
+              <p class="msg msg-user">Around $1,400.</p>
+              <p class="msg msg-bot">Thanks! Your dashboard will set an emergency-fund target of 3–6 months of expenses, following the MAS guide. Let's build toward it together.</p>
+            </div>
+
+            <div class="coach-window-foot" aria-hidden="true">
+              <span class="coach-input-mock">Message your coach…</span>
+              <span class="coach-send">Send</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ============================================================
+             SAMMI: paste Botpress embed snippet here.
+             From Botpress Studio > Webchat > Share, paste the two
+             <script> tags below this comment. By default they add a
+             floating chat button (the "Chat with your coach" button
+             above calls window.botpress.open() when it's present).
+             To render inline inside the window above instead, target
+             the #mfc-webchat container.
+             NOTE: passing the 5 user variables on init is Ryan's job
+             (Contract 3 in AlphaMinds_Integration_Handoff.txt).
+             ============================================================ -->
+        <div id="mfc-webchat"></div>
+        <!-- <script src="https://cdn.botpress.cloud/webchat/v2/inject.js"></script> -->
+        <!-- <script src="YOUR_BOTPRESS_CONFIG_URL.js"></script> -->
+
       </div>
     </section>
 
@@ -237,7 +295,63 @@
       <div class="mx-auto max-w-6xl px-5">
         <p class="eyebrow">Get started</p>
         <h2 class="section-title">Set up your coach in three steps</h2>
-        <p class="section-placeholder"><!-- Phase 3: 3-step onboarding panel --></p>
+
+        <!-- 3-step onboarding flow (Ezann's spec). Step state lives in site.js.
+             Single-user scope: user_id is fixed to "user1". -->
+        <div class="onboard" id="onboarding-flow" data-user-id="user1">
+
+          <ol class="onboard-steps">
+            <li class="step-dot is-active" data-dot="1"><span class="step-dot-num">1</span><span class="step-dot-label">Welcome</span></li>
+            <li class="step-dot" data-dot="2"><span class="step-dot-num">2</span><span class="step-dot-label">Connect Telegram</span></li>
+            <li class="step-dot" data-dot="3"><span class="step-dot-num">3</span><span class="step-dot-label">Start coaching</span></li>
+          </ol>
+
+          <div class="onboard-panels">
+
+            <!-- Step 1 — Welcome -->
+            <div class="onboard-panel" data-step="1">
+              <h3 class="step-heading" tabindex="-1">Let's set up your financial coach.</h3>
+              <p class="step-copy">It takes about a minute. You'll connect Telegram so your coach can check in on you each week, then jump straight into your first level.</p>
+              <p class="onboard-note">Demo profile: <code>user1</code> — no login needed for this single-user build.</p>
+              <button class="btn btn-accent" type="button" data-goto="2">Let's go</button>
+            </div>
+
+            <!-- Step 2 — Connect Telegram (the critical step) -->
+            <div class="onboard-panel" data-step="2" hidden>
+              <h3 class="step-heading" tabindex="-1">Connect Telegram</h3>
+              <p class="step-copy">Tap to open Telegram. This lets your coach send you weekly check-ins even when this tab is closed.</p>
+
+              <!-- EZANN: replace BOT_USERNAME_PLACEHOLDER with the real bot username from Rainie (Contract 5). -->
+              <a class="btn btn-telegram" href="https://t.me/BOT_USERNAME_PLACEHOLDER?start=user1" target="_blank" rel="noopener">
+                <svg class="tg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
+                Connect Telegram
+              </a>
+
+              <p class="onboard-note">Opens Telegram and sends <code>/start user1</code> to your coach. Your chat is captured securely on the server, not in this browser.</p>
+
+              <div class="onboard-actions">
+                <button class="btn btn-ghost btn-sm" type="button" data-goto="1">Back</button>
+                <button class="btn btn-accent btn-sm" type="button" data-goto="3">I've connected</button>
+              </div>
+            </div>
+
+            <!-- Step 3 — Enter the dashboard -->
+            <div class="onboard-panel" data-step="3" hidden>
+              <div class="onboard-success">
+                <span class="success-check" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+                </span>
+                <h3 class="step-heading" tabindex="-1">You're all set! Your coach is ready.</h3>
+                <p class="step-copy">Your weekly check-ins are on. Open the coach to enter your numbers and start Level&nbsp;1.</p>
+                <div class="onboard-actions onboard-actions-center">
+                  <button class="btn btn-ghost btn-sm" type="button" data-goto="2">Back</button>
+                  <button class="btn btn-accent" type="button" data-start-coaching>Start coaching</button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
       </div>
     </section>
 

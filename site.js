@@ -87,7 +87,57 @@
     });
   });
 
-  /* ---------- Onboarding step state (built in phase 3) ---------- */
-  // Step counter 1 -> 2 -> 3 per Ezann build spec; added in phase 3.
+  /* ---------- Onboarding step flow (Ezann's 3-step spec) ---------- */
+  var onboarding = document.getElementById("onboarding-flow");
+  if (onboarding) {
+    var panels = onboarding.querySelectorAll(".onboard-panel");
+    var dots = onboarding.querySelectorAll(".step-dot");
+
+    function goToStep(n) {
+      panels.forEach(function (panel) {
+        panel.hidden = Number(panel.dataset.step) !== n;
+      });
+      dots.forEach(function (dot) {
+        var dn = Number(dot.dataset.dot);
+        dot.classList.toggle("is-active", dn === n);
+        dot.classList.toggle("is-done", dn < n);
+      });
+      // Move focus to the newly shown heading for keyboard/screen-reader users
+      var heading = onboarding.querySelector('.onboard-panel[data-step="' + n + '"] .step-heading');
+      if (heading) heading.focus();
+    }
+
+    onboarding.addEventListener("click", function (e) {
+      var goBtn = e.target.closest("[data-goto]");
+      if (goBtn) {
+        goToStep(Number(goBtn.dataset.goto));
+        return;
+      }
+
+      var startBtn = e.target.closest("[data-start-coaching]");
+      if (startBtn) {
+        // Hand off to Ryan's app.js: fire mfc:dashboard-ready (Contract 3),
+        // then take the user to the coach chat.
+        window.MFC.revealDashboard();
+        var coach = document.getElementById("coach");
+        if (coach) coach.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
+  /* ---------- "Chat with your coach" button ---------- */
+  // Opens the live Botpress widget once Sammi's embed is present; until then,
+  // it guides the user to the setup steps.
+  var openCoachBtn = document.querySelector("[data-open-coach]");
+  if (openCoachBtn) {
+    openCoachBtn.addEventListener("click", function () {
+      if (window.botpress && typeof window.botpress.open === "function") {
+        window.botpress.open();
+      } else {
+        var onboard = document.getElementById("onboarding");
+        if (onboard) onboard.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
 
 })();
