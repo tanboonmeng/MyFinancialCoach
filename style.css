@@ -368,6 +368,254 @@ section[id] {
   margin: 0 0.35rem;
 }
 
+/* ---------- Problem & audience ---------- */
+.problem-lead {
+  font-size: 1.15rem;
+  color: var(--ink);
+  max-width: 60ch;
+  margin: 1.25rem 0 2.25rem;
+}
+.problem-lead strong { color: var(--brand-deep); }
+
+.contrast-card {
+  border-radius: var(--radius);
+  padding: 1.5rem 1.6rem;
+  border: 1px solid var(--line);
+}
+.contrast-gap {
+  background: var(--surface);
+}
+.contrast-fix {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+  color: #fff;
+}
+.contrast-title {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+.contrast-gap .contrast-title { color: var(--ink-soft); }
+.contrast-fix .contrast-title { color: var(--brand-tint); }
+
+.contrast-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+.contrast-list li {
+  position: relative;
+  padding-left: 1.6rem;
+  font-size: 1rem;
+}
+.contrast-list li::before {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.contrast-gap .contrast-list li::before { content: "—"; color: var(--lock); }
+.contrast-fix .contrast-list li::before { content: "✓"; color: var(--gold); }
+
+/* ---------- The 4-level journey ---------- */
+.journey-intro {
+  color: var(--ink-soft);
+  font-size: 1.05rem;
+  max-width: 52ch;
+  margin: 1rem 0 2.5rem;
+}
+
+.journey-path {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2rem 1.25rem;
+  align-items: start;   /* content-height cards: expanding one won't stretch its siblings */
+}
+@media (min-width: 768px) {
+  .journey-path { grid-template-columns: repeat(4, 1fr); }
+}
+
+.level-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Connector line linking the numbered nodes into a path */
+.level-step:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  background-image: linear-gradient(90deg, var(--lock) 55%, transparent 0);
+  background-size: 10px 2px;
+  background-repeat: repeat-x;
+}
+/* mobile: vertical connector above each node */
+.level-step:not(:first-child)::before {
+  top: -2rem;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 2rem;
+  background-image: linear-gradient(180deg, var(--lock) 55%, transparent 0);
+  background-size: 2px 10px;
+  background-repeat: repeat-y;
+}
+@media (min-width: 768px) {
+  /* desktop: horizontal connector into the node from the left */
+  .level-step:not(:first-child)::before {
+    top: 1.4rem;               /* aligns to node centre (node is 2.8rem tall) */
+    left: -0.625rem;
+    transform: translateX(-50%);
+    width: 1.25rem;
+    height: 2px;
+    background-image: linear-gradient(90deg, var(--lock) 55%, transparent 0);
+    background-size: 10px 2px;
+    background-repeat: repeat-x;
+  }
+}
+
+.level-node {
+  width: 2.8rem;
+  height: 2.8rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  margin-bottom: -1.4rem;   /* overlap the card top edge, stepper style */
+  z-index: 2;
+  border: 3px solid var(--bg);
+}
+.section-tint .level-node { border-color: #EAF6F0; }
+
+.is-unlocked .level-node {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 6px 16px rgba(14, 124, 102, 0.35);
+}
+.is-locked .level-node {
+  background: var(--surface);
+  border: 3px dashed var(--lock);
+  color: var(--lock);
+}
+.level-num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.15rem;
+}
+.lock-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  fill: var(--lock);
+}
+
+.level-card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 2.1rem 1.4rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.is-unlocked .level-card {
+  border-color: var(--brand);
+  box-shadow: 0 14px 30px rgba(10, 87, 72, 0.14);
+}
+.is-locked .level-card {
+  background: #FBFCFC;
+  border-style: dashed;
+}
+.is-locked .level-title,
+.is-locked .level-desc { color: var(--ink-soft); }
+
+.level-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.level-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  line-height: 1.2;
+}
+.level-tag {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+}
+.tag-start  { background: var(--gold); color: #5C3D07; }
+.tag-locked { background: var(--brand-tint); color: var(--lock); }
+
+.level-desc {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  flex: 1;
+}
+
+.level-benchmark {
+  margin-top: 0.4rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--brand-tint);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.is-locked .level-benchmark { background: #EFF4F2; }
+.benchmark-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-deep);
+}
+.is-locked .benchmark-tag { color: var(--lock); }
+.benchmark-value {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+.is-locked .benchmark-value { color: var(--ink-soft); }
+
+.level-hint-toggle {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--brand-deep);
+  background: none;
+  border: none;
+  padding: 0.2rem 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.level-hint-toggle:hover { color: var(--brand); }
+.level-hint {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-soft);
+  background: #EFF4F2;
+  border-left: 3px solid var(--lock);
+  padding: 0.6rem 0.75rem;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
 /* ---------- Footer ---------- */
 .site-footer {
   border-top: 1px solid var(--line);

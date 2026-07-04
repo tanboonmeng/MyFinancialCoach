@@ -73,6 +73,20 @@
     });
   }
 
+  /* ---------- Locked-level hint toggles (the 4-level journey) ---------- */
+  var hintToggles = document.querySelectorAll(".level-hint-toggle");
+  hintToggles.forEach(function (btn) {
+    var hint = btn.nextElementSibling;
+    if (!hint || !hint.classList.contains("level-hint")) return;
+
+    btn.addEventListener("click", function () {
+      var open = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", open ? "false" : "true");
+      hint.hidden = open;
+      btn.textContent = open ? "Why is this locked?" : "Got it — hide";
+    });
+  });
+
   /* ---------- Onboarding step state (built in phase 3) ---------- */
   // Step counter 1 -> 2 -> 3 per Ezann build spec; added in phase 3.
 
