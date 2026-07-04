@@ -54,12 +54,13 @@ It's a static site, so there's nothing to install or build:
 
 ## 4. The files (who owns what)
 
-| File          | What it is                          | Owner              |
-|---------------|-------------------------------------|--------------------|
-| `index.html`  | The whole single-page site          | shared             |
-| `style.css`   | All branding & styles               | shared             |
-| `site.js`     | UI behaviour (nav, onboarding steps)| shared             |
-| `app.js`      | MAS calculation logic (to be added) | **Ryan**           |
+| File          | What it is                            | Owner              |
+|---------------|---------------------------------------|--------------------|
+| `index.html`  | Landing page (marketing + onboarding) | shared             |
+| `app.html`    | Workspace: dashboard + coach chat     | shared             |
+| `style.css`   | All branding & styles (both pages)    | shared             |
+| `site.js`     | UI behaviour (nav, onboarding, dash)  | shared             |
+| `app.js`      | MAS calculation logic (to be added)   | **Ryan**           |
 
 The `.txt` files are our spec/handoff sheets — please **don't edit or delete**
 them; they're our source of truth.

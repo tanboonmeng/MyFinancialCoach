@@ -111,15 +111,8 @@
       var goBtn = e.target.closest("[data-goto]");
       if (goBtn) {
         goToStep(Number(goBtn.dataset.goto));
-        return;
       }
-
-      var startBtn = e.target.closest("[data-start-coaching]");
-      if (startBtn) {
-        // Reveal the progress dashboard and fire mfc:dashboard-ready
-        // (Ryan's Contract 3 hook). revealDashboard() handles the scroll.
-        window.MFC.revealDashboard();
-      }
+      // "Start coaching" is a link to app.html (the workspace) — no JS needed.
     });
   }
 
@@ -264,6 +257,12 @@
       section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
 
+    function init() {
+      // app page: render in place without scrolling
+      section.hidden = false;
+      render();
+    }
+
     function update(data) {
       if (!data) return;
       if (typeof data.currentLevel === "number") {
@@ -282,7 +281,7 @@
       if (!section.hidden) render();
     }
 
-    return { reveal: reveal, update: update, levelUp: levelUp };
+    return { reveal: reveal, update: update, levelUp: levelUp, init: init };
   })();
 
   // Wire the "Preview a level-up" demo button
@@ -301,5 +300,15 @@
   window.MFC.updateDashboard = function (data) {
     if (dashboard) dashboard.update(data);
   };
+
+  // On the app page (app.html) the dashboard is present and shown on load:
+  // render it and fire mfc:dashboard-ready so Ryan's app.js can initialise.
+  var dashOnLoad = document.getElementById("dashboard");
+  if (dashboard && dashOnLoad && !dashOnLoad.hidden) {
+    dashboard.init();
+    document.dispatchEvent(new CustomEvent("mfc:dashboard-ready", {
+      detail: { userId: window.MFC.userId }
+    }));
+  }
 
 })();

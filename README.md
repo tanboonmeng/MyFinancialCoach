@@ -14,7 +14,8 @@ Pages — see below)*
 
 ## What it is
 
-A branded, responsive single-page site that presents a strict, sequential
+A branded, responsive site — a marketing **landing page** plus a **workspace app
+page** (dashboard + coach chat) — that presents a strict, sequential
 **4-level coaching path** and embeds the team's already-built tools:
 
 1. **Level 1 — Emergency fund & money management** · 3–6 months of expenses
@@ -40,16 +41,21 @@ The website is the shell that embeds these pieces (see
 
 ## Project structure
 
+Two pages: a marketing **landing page** and the **workspace app page**.
+
 ```
-index.html   — the single page (7 sections + sticky nav)
-style.css    — brand tokens (:root) + all custom styling
-site.js      — UI behaviour only (nav, journey hints, onboarding steps)
+index.html   — landing page (hero, problem, 4-level journey, coach preview,
+               onboarding, how it works, footer)
+app.html     — the workspace: progress dashboard + live coach chat, opened
+               from "Start coaching" / "Open app"
+style.css    — brand tokens (:root) + all custom styling (shared by both pages)
+site.js      — UI behaviour (nav, journey hints, onboarding steps, dashboard)
              — exposes window.MFC as the mount point for Ryan's app.js
 TEAMMATE_SETUP.md — clone + git workflow guide for the team
 ```
 
 No build step, no framework — vanilla HTML/CSS/JS with Tailwind via CDN.
-Deploys as static files.
+Deploys as static files (the app page lives at `/app.html`).
 
 ## Run it locally
 

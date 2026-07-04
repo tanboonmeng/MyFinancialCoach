@@ -1201,6 +1201,69 @@ section[id] {
   stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
 }
 
+/* small note under the coach preview on the landing page */
+.coach-appnote {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.coach-appnote a {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- App page (workspace) ---------- */
+.app-nav-right { display: flex; align-items: center; gap: 1rem; }
+.user-chip {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.user-chip strong { color: var(--brand-deep); }
+
+.app-main { padding: 2.5rem 0 4rem; }
+.app-head { margin-bottom: 2rem; }
+.app-title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+@media (min-width: 1180px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    align-items: start;
+  }
+  .workspace-chat {
+    position: sticky;
+    top: calc(var(--nav-h) + 1rem);
+  }
+}
+.coach-window-tall .coach-window-body {
+  min-height: 20rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 480px) {
+  .chip-label { display: none; }
+}
+
 /* ---------- How it works (architecture strip) ---------- */
 .how-intro {
   color: var(--ink-soft);
