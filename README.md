@@ -71,3 +71,8 @@ editing, use VS Code's **Live Server** extension.
 - **Ezann** — replace `BOT_USERNAME_PLACEHOLDER` in the Telegram deep link with
   the real bot username from Rainie.
 - **Ryan** — add `app.js` with the MAS calculation logic (mount point is ready).
+  Feed the progress dashboard by calling
+  `window.MFC.updateDashboard({ currentLevel, savingsProgress, streakWeeks, ... })`,
+  and listen for the `mfc:dashboard-ready` event fired when the user taps
+  "Start coaching". The dashboard section renders the view from sample data
+  until your real numbers arrive.

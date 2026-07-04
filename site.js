@@ -116,28 +116,190 @@
 
       var startBtn = e.target.closest("[data-start-coaching]");
       if (startBtn) {
-        // Hand off to Ryan's app.js: fire mfc:dashboard-ready (Contract 3),
-        // then take the user to the coach chat.
+        // Reveal the progress dashboard and fire mfc:dashboard-ready
+        // (Ryan's Contract 3 hook). revealDashboard() handles the scroll.
         window.MFC.revealDashboard();
-        var coach = document.getElementById("coach");
-        if (coach) coach.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     });
   }
 
-  /* ---------- "Chat with your coach" button ---------- */
+  /* ---------- "Open coach" / "Chat with your coach" buttons ---------- */
   // Opens the live Botpress widget once Sammi's embed is present; until then,
-  // it guides the user to the setup steps.
-  var openCoachBtn = document.querySelector("[data-open-coach]");
-  if (openCoachBtn) {
-    openCoachBtn.addEventListener("click", function () {
+  // it scrolls to a fallback section (data-coach-fallback, default "coach").
+  document.querySelectorAll("[data-open-coach]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
       if (window.botpress && typeof window.botpress.open === "function") {
         window.botpress.open();
-      } else {
-        var onboard = document.getElementById("onboarding");
-        if (onboard) onboard.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
       }
+      var target = document.getElementById(btn.dataset.coachFallback || "coach");
+      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+  });
+
+  /* ---------- Progress dashboard (presentation only) ---------- */
+  // The website renders the VIEW; Ryan's app.js supplies the real numbers via
+  // window.MFC.updateDashboard({ currentLevel, savingsProgress, streakWeeks, ... }).
+  // Values below are clearly-labelled SAMPLE data for the demo — no financial
+  // calculation happens here.
+  var dashboard = (function () {
+    var section = document.getElementById("dashboard");
+    if (!section) return null;
+
+    var CIRCUMFERENCE = 326.7; // 2 * pi * r, r = 52
+    var CHECK_SVG = '<svg viewBox="0 0 24 24" style="width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>';
+
+    // Sample per-level state. Ryan overwrites the active level via updateDashboard().
+    var levels = [
+      { title: "Emergency fund", benchmark: "3–6 months of expenses", pct: 59,
+        detail: "$4,956 saved of $8,400 sample target",
+        next: "You're 59% there — keep going to unlock insurance." },
+      { title: "Insurance protection", benchmark: "9x / 4x annual income cover", pct: 8,
+        detail: "Just getting started on protection.",
+        next: "Set up your income protection to grow your safety net." },
+      { title: "Investing", benchmark: "≥10% of take-home pay", pct: 0,
+        detail: "Unlocks once you're protected.",
+        next: "Invest at least 10% of take-home pay — after Levels 1–2." },
+      { title: "Home & retirement", benchmark: "Plan with official calculators", pct: 0,
+        detail: "The big-picture planning stage.",
+        next: "Plan your first home and retirement with official tools." }
+    ];
+    var state = { currentLevel: 1, allComplete: false };
+
+    function setText(key, value) {
+      section.querySelectorAll('[data-dash="' + key + '"]').forEach(function (el) {
+        el.textContent = value;
+      });
+    }
+    function get(key) { return section.querySelector('[data-dash="' + key + '"]'); }
+
+    function render() {
+      var cur = state.currentLevel;
+      var doneCount = state.allComplete ? levels.length : cur - 1;
+
+      if (state.allComplete) {
+        setText("level", levels.length);
+        setText("level-title", "All levels complete");
+        setText("benchmark", "You've built the full plan");
+        setText("detail", "You've completed all four levels — brilliant work.");
+        setText("next", "Keep your streak going with your weekly check-ins.");
+        setText("pct", "100%");
+        var ringDone = get("ring");
+        if (ringDone) ringDone.style.strokeDashoffset = "0";
+      } else {
+        var lvl = levels[cur - 1];
+        setText("level", cur);
+        setText("level-title", lvl.title);
+        setText("benchmark", lvl.benchmark);
+        setText("detail", lvl.detail);
+        setText("next", lvl.next);
+        setText("pct", lvl.pct + "%");
+        var ring = get("ring");
+        if (ring) ring.style.strokeDashoffset = (CIRCUMFERENCE * (1 - lvl.pct / 100)).toFixed(1);
+      }
+
+      setText("completed", doneCount);
+      var overall = get("overall");
+      if (overall) overall.style.width = (doneCount / levels.length * 100) + "%";
+
+      section.querySelectorAll(".dash-lvl").forEach(function (li) {
+        var n = Number(li.dataset.lvl);
+        li.classList.remove("is-done", "is-current", "is-locked");
+        var badge = li.querySelector(".dash-lvl-badge");
+        var status = li.querySelector(".dash-lvl-status");
+        if (state.allComplete || n < cur) {
+          li.classList.add("is-done");
+          badge.innerHTML = CHECK_SVG;
+          status.textContent = "Done";
+        } else if (n === cur) {
+          li.classList.add("is-current");
+          badge.textContent = n;
+          status.textContent = "In progress";
+        } else {
+          li.classList.add("is-locked");
+          badge.textContent = n;
+          status.textContent = "Locked";
+        }
+      });
+    }
+
+    function celebrate(completedLevel) {
+      var li = section.querySelector('.dash-lvl[data-lvl="' + completedLevel + '"]');
+      if (li) {
+        li.classList.add("just-completed");
+        setTimeout(function () { li.classList.remove("just-completed"); }, 600);
+      }
+      var toast = get("toast");
+      if (toast) {
+        setText("toast-text", state.allComplete
+          ? "All four levels complete!"
+          : "Level " + completedLevel + " complete!");
+        toast.hidden = false;
+        clearTimeout(toast._timer);
+        toast._timer = setTimeout(function () { toast.hidden = true; }, 2600);
+      }
+    }
+
+    function levelUp() {
+      if (state.allComplete) return;
+      var completed = state.currentLevel;
+      // fill the ring to 100% first, then advance
+      var ring = get("ring");
+      if (ring) ring.style.strokeDashoffset = "0";
+      setText("pct", "100%");
+      setTimeout(function () {
+        if (state.currentLevel < levels.length) {
+          state.currentLevel += 1;
+        } else {
+          state.allComplete = true;
+        }
+        render();
+        celebrate(completed);
+      }, 450);
+    }
+
+    function reveal() {
+      section.hidden = false;
+      render();
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function update(data) {
+      if (!data) return;
+      if (typeof data.currentLevel === "number") {
+        state.currentLevel = Math.min(Math.max(data.currentLevel, 1), levels.length);
+        state.allComplete = false;
+      }
+      var active = levels[state.currentLevel - 1];
+      if (active) {
+        if (typeof data.savingsProgress !== "undefined") {
+          active.pct = parseInt(data.savingsProgress, 10) || 0;
+        }
+        if (data.detail) active.detail = data.detail;
+        if (data.next) active.next = data.next;
+      }
+      if (typeof data.streakWeeks !== "undefined") setText("streak", data.streakWeeks);
+      if (!section.hidden) render();
+    }
+
+    return { reveal: reveal, update: update, levelUp: levelUp };
+  })();
+
+  // Wire the "Preview a level-up" demo button
+  var levelUpBtn = document.querySelector("[data-levelup]");
+  if (levelUpBtn && dashboard) {
+    levelUpBtn.addEventListener("click", function () { dashboard.levelUp(); });
   }
+
+  // Extend the public mount point for Ryan's app.js
+  window.MFC.revealDashboard = function () {
+    document.dispatchEvent(new CustomEvent("mfc:dashboard-ready", {
+      detail: { userId: window.MFC.userId }
+    }));
+    if (dashboard) dashboard.reveal();
+  };
+  window.MFC.updateDashboard = function (data) {
+    if (dashboard) dashboard.update(data);
+  };
 
 })();

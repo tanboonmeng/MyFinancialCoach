@@ -237,7 +237,7 @@
               <li>Won't recommend products or stocks — it points you to a licensed adviser</li>
               <li>Only asks for the basics — never your NRIC, bank details, or passwords</li>
             </ul>
-            <button class="btn btn-accent" type="button" data-open-coach>Chat with your coach</button>
+            <button class="btn btn-accent" type="button" data-open-coach data-coach-fallback="onboarding">Chat with your coach</button>
           </div>
 
           <!-- Native-styled chat window. Shows a sample conversation until the
@@ -352,6 +352,118 @@
 
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- 5b. YOUR DASHBOARD  (hidden; revealed by "Start coaching")     -->
+    <!-- Presentation only. Ryan's app.js feeds real numbers via        -->
+    <!-- window.MFC.updateDashboard(...) — see site.js. Values here are  -->
+    <!-- clearly-labelled SAMPLE data for the demo.                     -->
+    <!-- ============================================================ -->
+    <section class="section section-tint" id="dashboard" hidden aria-label="Your progress dashboard">
+      <div class="mx-auto max-w-6xl px-5">
+        <p class="eyebrow">Your dashboard</p>
+        <h2 class="section-title">Your progress, at a glance</h2>
+        <p class="dash-sub">Sample view for <code>user1</code> — your coach keeps these numbers up to date as you go.</p>
+
+        <!-- stat row -->
+        <div class="dash-stats">
+          <div class="dash-stat">
+            <span class="dash-stat-label">Current level</span>
+            <span class="dash-stat-value">Level <span data-dash="level">1</span> · <span data-dash="level-title">Emergency fund</span></span>
+          </div>
+          <div class="dash-stat">
+            <span class="dash-stat-label">Weekly streak</span>
+            <span class="dash-stat-value dash-streak">
+              <svg class="flame-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2s5 4.5 5 9.5a5 5 0 0 1-10 0c0-1.5.5-2.7 1-3.5.2 1.2 1 2 2 2 .8 0 1.3-.6 1-1.7-.4-1.6-.5-3.7 1-6.3z"/></svg>
+              <span><span data-dash="streak">3</span>-week streak</span>
+            </span>
+          </div>
+          <div class="dash-stat">
+            <span class="dash-stat-label">Overall</span>
+            <span class="dash-stat-value"><span data-dash="completed">0</span> of 4 levels done</span>
+            <div class="dash-overall"><div class="dash-overall-fill" data-dash="overall"></div></div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+
+          <!-- current-level focus -->
+          <div class="dash-focus">
+            <span class="dash-focus-tag">You're on Level <span data-dash="level">1</span></span>
+            <h3 class="dash-focus-title" data-dash="level-title">Emergency fund</h3>
+
+            <div class="dash-ring-row">
+              <div class="dash-ring">
+                <svg viewBox="0 0 120 120" aria-hidden="true">
+                  <circle class="ring-bg" cx="60" cy="60" r="52" />
+                  <circle class="ring-fg" cx="60" cy="60" r="52" data-dash="ring" />
+                </svg>
+                <div class="ring-label">
+                  <span class="ring-pct" data-dash="pct">59%</span>
+                  <span class="ring-cap">of target</span>
+                </div>
+              </div>
+              <div class="dash-figures">
+                <p class="dash-detail" data-dash="detail">$4,956 saved of $8,400 sample target</p>
+                <p class="dash-bench">MAS benchmark · <span data-dash="benchmark">3–6 months of expenses</span></p>
+                <p class="dash-next"><span class="dash-next-label">Next step</span> <span data-dash="next">You're 59% there — keep going to unlock insurance.</span></p>
+              </div>
+            </div>
+
+            <div class="dash-actions">
+              <button class="btn btn-accent btn-sm" type="button" data-open-coach>Open coach</button>
+              <button class="btn btn-ghost btn-sm" type="button" data-levelup>Preview a level-up (demo)</button>
+            </div>
+          </div>
+
+          <!-- 4-level tracker -->
+          <div class="dash-track">
+            <h3 class="dash-track-title">Your four levels</h3>
+            <ol class="dash-levels">
+              <li class="dash-lvl" data-lvl="1">
+                <span class="dash-lvl-badge"></span>
+                <span class="dash-lvl-body">
+                  <span class="dash-lvl-title">Emergency fund &amp; money management</span>
+                  <span class="dash-lvl-bench">3–6 months of expenses</span>
+                </span>
+                <span class="dash-lvl-status"></span>
+              </li>
+              <li class="dash-lvl" data-lvl="2">
+                <span class="dash-lvl-badge"></span>
+                <span class="dash-lvl-body">
+                  <span class="dash-lvl-title">Insurance protection</span>
+                  <span class="dash-lvl-bench">9x / 4x annual income cover</span>
+                </span>
+                <span class="dash-lvl-status"></span>
+              </li>
+              <li class="dash-lvl" data-lvl="3">
+                <span class="dash-lvl-badge"></span>
+                <span class="dash-lvl-body">
+                  <span class="dash-lvl-title">Investing</span>
+                  <span class="dash-lvl-bench">≥10% of take-home pay</span>
+                </span>
+                <span class="dash-lvl-status"></span>
+              </li>
+              <li class="dash-lvl" data-lvl="4">
+                <span class="dash-lvl-badge"></span>
+                <span class="dash-lvl-body">
+                  <span class="dash-lvl-title">Home &amp; retirement</span>
+                  <span class="dash-lvl-bench">Plan with official calculators</span>
+                </span>
+                <span class="dash-lvl-status"></span>
+              </li>
+            </ol>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- level-up celebration toast -->
+      <div class="dash-toast" data-dash="toast" hidden role="status" aria-live="polite">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
+        <span data-dash="toast-text">Level complete!</span>
       </div>
     </section>
 
