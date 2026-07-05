@@ -157,6 +157,54 @@
 
           </div>
 
+          <!-- =====================================================
+               "ENTER MY NUMBERS" — demo-safe fallback (Ryan spec §5).
+               Two doors, one pipeline: this form and the coach chat
+               both feed window.MFC.ingestExtraction (Contract 2).
+               ===================================================== -->
+          <div class="entry-panel" id="entry">
+            <h3 class="entry-title">Enter my numbers</h3>
+            <p class="entry-sub">Type them in, or just tell your coach in the chat — both feed the same calculator. Leave anything blank and add it later.</p>
+
+            <form id="entryForm" novalidate>
+              <div class="entry-grid">
+                <label class="entry-field">
+                  <span class="entry-label">Monthly take-home income</span>
+                  <input type="number" name="monthly_take_home_income" min="0" step="any" inputmode="decimal" placeholder="e.g. 2800" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Monthly expenses</span>
+                  <input type="number" name="monthly_expenses" min="0" step="any" inputmode="decimal" placeholder="e.g. 1400" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Current savings</span>
+                  <input type="number" name="current_savings" min="0" step="any" inputmode="decimal" placeholder="e.g. 4956" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Monthly insurance premium</span>
+                  <input type="number" name="monthly_insurance_premium" min="0" step="any" inputmode="decimal" placeholder="e.g. 120" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Death &amp; TPD coverage</span>
+                  <input type="number" name="dtpd_coverage_amount" min="0" step="any" inputmode="decimal" placeholder="e.g. 300000" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Critical illness coverage</span>
+                  <input type="number" name="critical_illness_coverage_amount" min="0" step="any" inputmode="decimal" placeholder="e.g. 130000" />
+                </label>
+                <label class="entry-field">
+                  <span class="entry-label">Monthly investing amount</span>
+                  <input type="number" name="monthly_investment_amount" min="0" step="any" inputmode="decimal" placeholder="e.g. 280" />
+                </label>
+              </div>
+
+              <div class="entry-actions">
+                <button class="btn btn-accent btn-sm" type="submit">Save my numbers</button>
+                <p class="entry-status" id="entryStatus" role="status" aria-live="polite" hidden></p>
+              </div>
+            </form>
+          </div>
+
           <!-- level-up celebration toast -->
           <div class="dash-toast" data-dash="toast" hidden role="status" aria-live="polite">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>
@@ -287,12 +335,11 @@
 
   <script src="site.js"></script>
 
-  <!-- RYAN: app.js mount point.
-       - On load, this page fires "mfc:dashboard-ready" (detail.userId).
-       - Feed the dashboard with window.MFC.updateDashboard({ currentLevel,
-         savingsProgress, streakWeeks, detail, next }).
-       - Init the Botpress widget and pass the 5 user variables (Contract 3). -->
-  <!-- <script src="app.js"></script> -->
+  <!-- Ryan's calculation layer (the ONLY place math happens).
+       Contracts: ingests the Gemini 9-field JSON via
+       window.MFC.ingestExtraction (Contract 2); Phase 2 wires
+       updateDashboard, Phase 4 pushes the 5 Botpress vars (Contract 3). -->
+  <script src="app.js"></script>
 
 </body>
 </html>
