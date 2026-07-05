@@ -140,14 +140,14 @@
     });
   }
 
-  /* ---------- "Open coach" / "Chat with your coach" buttons ---------- */
-  // Opens the live Botpress widget once Sammi's embed is present; until then,
-  // it scrolls to a fallback section (data-coach-fallback, default "coach").
+  /* ---------- "Ask your coach" button (dashboard) ---------- */
+  // The chat is embedded inline and already open, so this jumps to the chat
+  // panel (useful on mobile, where it sits below the dashboard) and makes
+  // sure the widget is open in case it was closed.
   document.querySelectorAll("[data-open-coach]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       if (window.botpress && typeof window.botpress.open === "function") {
-        window.botpress.open();
-        return;
+        try { window.botpress.open(); } catch (e) { /* non-fatal */ }
       }
       var target = document.getElementById(btn.dataset.coachFallback || "coach");
       if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
