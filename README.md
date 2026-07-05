@@ -72,8 +72,11 @@ editing, use VS Code's **Live Server** extension.
 
 ## Placeholders to fill before the demo
 
-- **Sammi** — paste the Botpress embed snippet at the marked block in the Coach
-  chat section of `index.html`.
+- ~~**Sammi** — Botpress embed~~ **DONE** — the live webchat is embedded on
+  `app.html` (official share snippet, floating-bubble mode; see the comment
+  there. Webchat v3.6 ignores the `selector` inline-embed option, so the
+  in-page window stays a styled preview and the "Open live chat" button opens
+  the bubble).
 - **Ezann** — replace `BOT_USERNAME_PLACEHOLDER` in the Telegram deep link with
   the real bot username from Rainie.
 - **Ryan** — add `app.js` with the MAS calculation logic (mount point is ready).

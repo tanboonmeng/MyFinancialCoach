@@ -1260,6 +1260,21 @@ section[id] {
   overflow-y: auto;
 }
 
+/* Live-chat bar under the preview window (the live Botpress widget is the
+   floating bubble; this bar opens it via window.botpress.open()). */
+.coach-window-foot-live {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.coach-live-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
 @media (max-width: 480px) {
   .chip-label { display: none; }
 }

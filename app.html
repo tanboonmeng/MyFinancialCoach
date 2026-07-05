@@ -166,8 +166,9 @@
               <span class="coach-preview-badge">Preview</span>
             </div>
 
-            <!-- The live Botpress webchat renders into #mfc-webchat; the sample
-                 messages below are a fallback shown until the embed is added. -->
+            <!-- Sample conversation preview. The LIVE chat is the Botpress
+                 bubble at the bottom-right of this page (see embed note at
+                 the end of this file); the button below opens it. -->
             <div class="coach-window-body" id="mfc-webchat">
               <p class="msg msg-bot">Hi! I'm your financial coach. Let's start with Level 1 — roughly how much do you take home each month?</p>
               <p class="msg msg-user">About $2,800.</p>
@@ -176,9 +177,9 @@
               <p class="msg msg-bot">Thanks! Your dashboard will set an emergency-fund target of 3–6 months of expenses, following the MAS guide. Let's build toward it together.</p>
             </div>
 
-            <div class="coach-window-foot" aria-hidden="true">
-              <span class="coach-input-mock">Message your coach…</span>
-              <span class="coach-send">Send</span>
+            <div class="coach-window-foot coach-window-foot-live">
+              <span class="coach-live-note"><span class="status-dot"></span>Your live coach opens at the bottom-right of this page.</span>
+              <button class="btn btn-accent btn-sm" type="button" data-open-coach>Open live chat</button>
             </div>
           </div>
         </aside>
@@ -188,14 +189,30 @@
   </main>
 
   <!-- ============================================================
-       SAMMI: paste Botpress embed snippet here.
-       From Botpress Studio > Webchat > Share, paste the two <script>
-       tags below. By default they add a floating chat button (the
-       "Open coach" button calls window.botpress.open() when present).
-       To render inline in the window above, target #mfc-webchat.
+       LIVE BOTPRESS WEBCHAT — official share snippet, floating mode.
+       Note (verified 2026-07-05): webchat v3.6 renders in shadow DOM at
+       body level and ignores the "selector" init option, so the inline
+       container embed documented for earlier versions (.bpWebchat/.bpFab
+       CSS) does not work here. The chat therefore opens as the standard
+       bottom-right bubble; the #mfc-webchat window above stays as a
+       styled preview panel with an "Open live chat" action.
+       SAMMI: if you regenerate the snippet in Botpress Studio, just
+       replace the second <script> URL below.
        ============================================================ -->
-  <!-- <script src="https://cdn.botpress.cloud/webchat/v2/inject.js"></script> -->
-  <!-- <script src="YOUR_BOTPRESS_CONFIG_URL.js"></script> -->
+  <script src="https://cdn.botpress.cloud/webchat/v3.6/inject.js"></script>
+  <script src="https://files.bpcontent.cloud/2026/07/04/04/20260704045157-J01PYF0L.js" defer></script>
+  <script>
+    // Flip the preview badge to "Live" once the webchat is ready.
+    (function () {
+      if (!window.botpress || typeof window.botpress.on !== "function") return;
+      function markLive() {
+        var badge = document.querySelector(".coach-preview-badge");
+        if (badge) badge.textContent = "Live";
+      }
+      window.botpress.on("webchat:ready", markLive);
+      window.botpress.on("webchat:initialized", markLive);
+    })();
+  </script>
 
   <script src="site.js"></script>
 
