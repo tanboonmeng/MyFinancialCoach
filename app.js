@@ -123,8 +123,14 @@
   })();
 
   /* =================================================================
-     STATE (in-memory for Phase 1; localStorage arrives in Phase 2)
+     STATE & PERSISTENCE (spec §4) — localStorage "mfc_state_v1",
+     version-guarded: parse failure or version mismatch resets cleanly.
+     The streak is NOT persisted here — it is owned by the n8n/Sheets
+     loop; the dashboard keeps its clearly-labelled sample value.
      ================================================================= */
+  var STATE_KEY = "mfc_state_v1";
+  var STATE_VERSION = 1;
+
   var FIELDS = [
     "monthly_take_home_income",
     "monthly_expenses",
@@ -143,10 +149,78 @@
   };
   FIELDS.forEach(function (k) { state.inputs[k] = null; });
 
+  function hasAnyInput() {
+    return FIELDS.some(function (k) { return state.inputs[k] !== null; });
+  }
+
+  function saveState() {
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        version: STATE_VERSION,
+        inputs: state.inputs,
+        derived: state.derived,
+        currentLevel: state.currentLevel,
+        lastUpdated: state.lastUpdated
+      }));
+    } catch (e) { /* private mode / quota — state stays in memory */ }
+  }
+
+  function loadState() {
+    var raw = null;
+    try { raw = localStorage.getItem(STATE_KEY); } catch (e) { return; }
+    if (!raw) return;
+    var saved = null;
+    try { saved = JSON.parse(raw); } catch (e) { saved = null; }
+    if (!saved || saved.version !== STATE_VERSION || typeof saved.inputs !== "object") {
+      // schema change or corrupt state -> reset cleanly, never crash
+      try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+      console.warn("[app.js] stored state invalid or old version — reset to empty.");
+      return;
+    }
+    FIELDS.forEach(function (k) {
+      var v = saved.inputs[k];
+      if (isNum(v) && v >= 0) state.inputs[k] = v;
+    });
+    if (isNum(saved.currentLevel) && saved.currentLevel >= 1 && saved.currentLevel <= 4) {
+      state.currentLevel = Math.round(saved.currentLevel);
+    }
+    if (typeof saved.lastUpdated === "string") state.lastUpdated = saved.lastUpdated;
+  }
+
+  /* =================================================================
+     DASHBOARD OUT (spec §3c) — window.MFC.updateDashboard payload:
+     { currentLevel, savings:{current,target,pct}, levels:[{id,state}] }
+     streakCount is intentionally omitted: the streak belongs to n8n/
+     Sheets, so the dashboard keeps its labelled sample value.
+     Level-aware labels re-render from LEVEL_METRICS via currentLevel
+     inside site.js — no label logic here.
+     ================================================================= */
+  function pushDashboard() {
+    if (!window.MFC || typeof window.MFC.updateDashboard !== "function") return;
+    if (!hasAnyInput()) return; // keep the sample view until real numbers exist
+    var d = state.derived;
+    window.MFC.updateDashboard({
+      currentLevel: state.currentLevel,
+      savings: {
+        current: state.inputs.current_savings,
+        target: isNum(d.emergencyTargetFull) ? d.emergencyTargetFull : null,
+        pct: isNum(d.savingsProgressPct) ? d.savingsProgressPct : null
+      },
+      levels: [1, 2, 3, 4].map(function (id) {
+        return {
+          id: id,
+          state: id < state.currentLevel ? "done"
+               : id === state.currentLevel ? "current" : "locked"
+        };
+      })
+    });
+  }
+
   function recompute() {
     state.derived = computeAll(state.inputs);
     state.lastUpdated = new Date().toISOString();
-    // Phase 2: persist + window.MFC.updateDashboard(...)
+    saveState();
+    pushDashboard();
     // Phase 3: gatekeeping state machine
     // Phase 4: Botpress variable push
     console.log("[app.js] recomputed:", JSON.parse(JSON.stringify({
@@ -253,5 +327,22 @@
     computeAll: computeAll,
     fmtSGD: fmtSGD
   };
+
+  /* =================================================================
+     STARTUP (Phase 2)
+     - site.js fires 'mfc:dashboard-ready' when the dashboard section
+       initialises; on app.html that happens BEFORE this file loads, so
+       we also push directly after loading persisted state.
+     - With an empty state we push nothing: the dashboard keeps its
+       clearly-labelled sample view until real numbers exist.
+     ================================================================= */
+  document.addEventListener("mfc:dashboard-ready", function () {
+    pushDashboard();
+  });
+
+  loadState();
+  if (hasAnyInput()) {
+    recompute(); // derives, persists, and pushes the restored numbers
+  }
 
 })();

@@ -196,7 +196,15 @@
 
     function render() {
       var cur = state.currentLevel;
-      var doneCount = state.allComplete ? levels.length : cur - 1;
+      var override = state.levelOverride || null;
+      var doneCount;
+      if (override) {
+        doneCount = Object.keys(override).filter(function (k) {
+          return override[k] === "done";
+        }).length;
+      } else {
+        doneCount = state.allComplete ? levels.length : cur - 1;
+      }
 
       // Level-aware framing (label + unit + benchmark caption) from the map.
       var metric = LEVEL_METRICS[state.allComplete ? levels.length : cur];
@@ -233,11 +241,13 @@
         li.classList.remove("is-done", "is-current", "is-locked");
         var badge = li.querySelector(".dash-lvl-badge");
         var status = li.querySelector(".dash-lvl-status");
-        if (state.allComplete || n < cur) {
+        // an explicit levels[] payload (spec §3c) wins over derivation
+        var st = override ? override[n] : null;
+        if (st === "done" || (!st && (state.allComplete || n < cur))) {
           li.classList.add("is-done");
           badge.innerHTML = CHECK_SVG;
           status.textContent = "Done";
-        } else if (n === cur) {
+        } else if (st === "current" || (!st && n === cur)) {
           li.classList.add("is-current");
           badge.textContent = n;
           status.textContent = "In progress";
@@ -279,6 +289,7 @@
         } else {
           state.allComplete = true;
         }
+        state.levelOverride = null; // demo derives states from currentLevel
         render();
         celebrate(completed);
       }, 450);
@@ -296,6 +307,14 @@
       render();
     }
 
+    function fmtMoney(n) {
+      return "$" + Math.round(n).toLocaleString("en-SG");
+    }
+
+    // Accepts both the original shape ({ currentLevel, savingsProgress,
+    // streakWeeks, detail, next }) and Ryan's spec §3c payload
+    // ({ currentLevel, streakCount, savings:{current,target,pct},
+    //    levels:[{id, state}] }). Rendering-only extension.
     function update(data) {
       if (!data) return;
       if (typeof data.currentLevel === "number") {
@@ -309,6 +328,34 @@
         }
         if (data.detail) active.detail = data.detail;
         if (data.next) active.next = data.next;
+
+        // spec §3c: real numbers from app.js (null-safe copy per C2)
+        if (data.savings && typeof data.savings === "object") {
+          var s = data.savings;
+          if (s.target === null || typeof s.target === "undefined") {
+            active.pct = 0;
+            active.detail = "Enter your monthly expenses to set your emergency-fund target.";
+          } else if (s.current === null || typeof s.current === "undefined") {
+            active.pct = 0;
+            active.detail = "Target " + fmtMoney(s.target) + " — add your current savings to see progress.";
+          } else {
+            active.pct = (typeof s.pct === "number") ? Math.min(Math.max(s.pct, 0), 100) : 0;
+            active.detail = fmtMoney(s.current) + " saved of " + fmtMoney(s.target) + " target";
+            if (!data.next) active.next = "You're " + active.pct + "% of the way to your full 6-month target.";
+          }
+          // Real numbers are in: relabel the sub line (streak stays sample).
+          var sub = section.querySelector(".dash-sub");
+          if (sub) sub.innerHTML = "Live numbers for <code>user1</code> — the weekly streak stays sample data until the Telegram loop feeds it.";
+        }
+      }
+      if (Array.isArray(data.levels)) {
+        state.levelOverride = {};
+        data.levels.forEach(function (l) {
+          if (l && typeof l.id === "number") state.levelOverride[l.id] = l.state;
+        });
+      }
+      if (typeof data.streakCount !== "undefined" && data.streakCount !== null) {
+        setText("streak", data.streakCount);
       }
       if (typeof data.streakWeeks !== "undefined") setText("streak", data.streakWeeks);
       if (!section.hidden) render();
