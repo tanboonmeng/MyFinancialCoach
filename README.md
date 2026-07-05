@@ -81,8 +81,9 @@ editing, use VS Code's **Live Server** extension.
   can't be embedded in a container); the widget node is re-parented into
   `#mfc-webchat` on ready. Config is copied verbatim from the generated
   share snippet — see the comment in `app.html` for how to update it.
-- **Ezann** — replace `BOT_USERNAME_PLACEHOLDER` in the Telegram deep link with
-  the real bot username from Rainie.
+- ~~**Ezann** — Telegram bot username~~ **DONE** — the Connect Telegram deep
+  link in `index.html` points to the live bot `@alphaminds_c240_bot`
+  (`https://t.me/alphaminds_c240_bot?start=user1`), payload intact.
 - **Ryan** — add `app.js` with the MAS calculation logic (mount point is ready).
   Feed the progress dashboard by calling
   `window.MFC.updateDashboard({ currentLevel, savingsProgress, streakWeeks, ... })`,
