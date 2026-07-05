@@ -218,38 +218,56 @@
       });
 
       // v3.3 ignores the selector option and mounts the widget at body
-      // level (light DOM), so on ready we move the widget node into
-      // #mfc-webchat, hide the floating bubble, and open the chat — the
-      // result is ONE inline chat, live on page load, no click needed.
-      var embedded = false;
-      function embedInline() {
-        if (embedded) return;
-        var mount = document.getElementById("mfc-webchat");
+      // level. IMPORTANT: do NOT re-parent the widget into the mount —
+      // its UI lives in an iframe, and moving an iframe resets its
+      // document, leaving a blank panel. Instead we PIN the widget over
+      // the #mfc-webchat spacer with positioning only (the approach the
+      // Botpress embed docs endorse: "update the bpWebchat class to
+      // change the size and position").
+      var mount = document.getElementById("mfc-webchat");
+      var pinned = false;
+
+      function pinWidget() {
         var widget = document.querySelector(".bpWebchat");
-        if (!mount || !widget) return;
-        mount.appendChild(widget);
-        ["bpFabWrapper", "bpMessagePreview"].forEach(function (cls) {
-          var el = document.querySelector("." + cls);
-          if (el) el.style.display = "none";
-        });
-        embedded = true;
+        if (!widget || !mount) return;
+        var r = mount.getBoundingClientRect();
+        var s = widget.style;
+        s.position = "absolute";
+        s.top = Math.round(r.top + window.scrollY) + "px";
+        s.left = Math.round(r.left + window.scrollX) + "px";
+        s.width = Math.round(r.width) + "px";
+        s.height = Math.round(r.height) + "px";
+        s.maxWidth = "none";
+        s.maxHeight = "none";
+        s.right = "auto";
+        s.bottom = "auto";
+        s.zIndex = "10";   /* below the sticky nav (z-index 50) */
+        pinned = true;
+      }
+
+      function goLive() {
+        pinWidget();
         try { window.botpress.open(); } catch (e) { /* non-fatal */ }
       }
+
       if (typeof window.botpress.on === "function") {
-        window.botpress.on("webchat:ready", embedInline);
-        window.botpress.on("webchat:initialized", embedInline);
+        window.botpress.on("webchat:ready", goLive);
+        window.botpress.on("webchat:initialized", goLive);
         // The inline chat is a fixed part of the workspace — if it gets
         // closed (widget X button), reopen it.
         window.botpress.on("webchat:closed", function () {
-          if (embedded) setTimeout(function () {
+          if (pinned) setTimeout(function () {
             try { window.botpress.open(); } catch (e) {}
           }, 150);
         });
       }
-      // Safety net: a click on an empty chat panel reopens the widget.
-      document.getElementById("mfc-webchat").addEventListener("click", function () {
-        if (embedded) { try { window.botpress.open(); } catch (e) {} }
-      });
+
+      // Keep the widget glued to the spacer through resizes and layout
+      // shifts (e.g. the level-up demo changing the dashboard's height).
+      window.addEventListener("resize", pinWidget);
+      if ("ResizeObserver" in window) {
+        new ResizeObserver(function () { pinWidget(); }).observe(document.body);
+      }
     })();
   </script>
 
