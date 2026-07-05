@@ -436,6 +436,37 @@
     }, 1500);
   })();
 
+  /* =================================================================
+     5. n8n WORKFLOW C LEVEL SYNC (Contract 4 / spec §3d) — OPTIONAL,
+        OFF BY DEFAULT. The Workflow C webhook endpoint isn't built yet,
+        so level changes are updated in the CoachStore sheet manually
+        for the demo (documented scoping decision). To enable, set
+        BEFORE app.js loads (see the RAINIE comment in app.html):
+          window.MFC_CONFIG = { workflowCUrl: "<n8n webhook url>" };
+        Fires only on a REAL level change, POSTing Contract 4's exact
+        body: { "user_id": "user1", "current_level": <n> }.
+     ================================================================= */
+  function pushLevelSync(newLevel) {
+    var cfg = window.MFC_CONFIG || {};
+    if (!cfg.workflowCUrl) return; // flag OFF -> skip silently
+    try {
+      fetch(cfg.workflowCUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: (window.MFC && window.MFC.userId) || "user1",
+          current_level: newLevel
+        })
+      }).then(function (r) {
+        console.log("[app.js] Workflow C level sync sent: level " + newLevel + " (HTTP " + r.status + ")");
+      }).catch(function (e) {
+        console.warn("[app.js] Workflow C level sync failed (non-fatal):", e);
+      });
+    } catch (e) {
+      console.warn("[app.js] Workflow C level sync failed (non-fatal):", e);
+    }
+  }
+
   function pushDashboard(celebrateLevel) {
     if (!window.MFC || typeof window.MFC.updateDashboard !== "function") return;
     if (!hasAnyInput()) return; // keep the sample view until real numbers exist
@@ -474,6 +505,7 @@
     saveState();
     pushDashboard(leveledUp ? next - 1 : undefined);
     pushBotpressVars("recalc"); // Contract 3: after every recalculation
+    if (leveledUp) pushLevelSync(next); // Contract 4 (no-op while flag OFF)
     console.log("[app.js] recomputed:", JSON.parse(JSON.stringify({
       inputs: state.inputs, derived: state.derived,
       currentLevel: state.currentLevel, leveledUp: leveledUp

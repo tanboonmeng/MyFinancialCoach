@@ -84,9 +84,18 @@ editing, use VS Code's **Live Server** extension.
 - ~~**Ezann** — Telegram bot username~~ **DONE** — the Connect Telegram deep
   link in `index.html` points to the live bot `@alphaminds_c240_bot`
   (`https://t.me/alphaminds_c240_bot?start=user1`), payload intact.
-- **Ryan** — add `app.js` with the MAS calculation logic (mount point is ready).
-  Feed the progress dashboard by calling
-  `window.MFC.updateDashboard({ currentLevel, savingsProgress, streakWeeks, ... })`,
-  and listen for the `mfc:dashboard-ready` event fired when the user taps
-  "Start coaching". The dashboard section renders the view from sample data
-  until your real numbers arrive.
+- ~~**Ryan** — `app.js` calculation layer~~ **DONE** — pure MAS formulas with
+  28 console.assert self-tests, `window.MFC.ingestExtraction` (Contract 2)
+  fed by both the coach pipeline and the "Enter my numbers" panel,
+  `mfc_state_v1` persistence, forward-only gatekeeping (L1 at 3x expenses;
+  L2 needs 9x/4x cover + the 15% premium cap), coverage-cap conflict flag,
+  and the 6 user variables pushed to Botpress on init + every recalc via
+  `window.botpress.updateUser` (Contract 3).
+- **Rainie** — Workflow C level sync (Contract 4) is coded but OFF by
+  default. When the n8n webhook exists, uncomment the `MFC_CONFIG` line in
+  `app.html` and paste the URL; until then, update `current_level` in the
+  CoachStore sheet manually for the demo (documented scoping decision).
+- **Sammi** — map the 6 incoming webchat user-data fields to Studio user
+  variables so `{{user.currentLevel}}` etc. resolve (values arrive as
+  strings; `coverageCapConflict` as `"true"`/`"false"`), and apply the
+  coach-prompt v3→v4 coverage-cap section.

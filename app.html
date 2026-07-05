@@ -335,10 +335,19 @@
 
   <script src="site.js"></script>
 
+  <!-- RAINIE: Workflow C level sync (Contract 4) is coded but OFF.
+       When the n8n webhook exists, enable it by uncommenting this line
+       and pasting the real webhook URL — app.js will then POST
+       { "user_id": "user1", "current_level": <n> } on every level-up.
+       While OFF, update current_level in the CoachStore sheet manually
+       for the demo (documented scoping decision). -->
+  <!-- <script>window.MFC_CONFIG = { workflowCUrl: "https://YOUR-N8N-HOST/webhook/workflow-c" };</script> -->
+
   <!-- Ryan's calculation layer (the ONLY place math happens).
-       Contracts: ingests the Gemini 9-field JSON via
-       window.MFC.ingestExtraction (Contract 2); Phase 2 wires
-       updateDashboard, Phase 4 pushes the 5 Botpress vars (Contract 3). -->
+       Contracts: Gemini 9-field JSON in via window.MFC.ingestExtraction
+       (Contract 2); dashboard out via updateDashboard (spec 3c); the 6
+       Botpress user variables out on init + every recalc (Contract 3);
+       optional Workflow C level sync (Contract 4, flag above). -->
   <script src="app.js"></script>
 
 </body>
