@@ -329,8 +329,11 @@
         if (data.detail) active.detail = data.detail;
         if (data.next) active.next = data.next;
 
-        // spec §3c: real numbers from app.js (null-safe copy per C2)
-        if (data.savings && typeof data.savings === "object") {
+        // spec §3c: real numbers from app.js (null-safe copy per C2).
+        // savings{} describes the EMERGENCY FUND, so it fills the focus
+        // card only while Level 1 is current; for levels 2-4 app.js
+        // sends a level-appropriate focus{} instead.
+        if (data.savings && typeof data.savings === "object" && state.currentLevel === 1) {
           var s = data.savings;
           if (s.target === null || typeof s.target === "undefined") {
             active.pct = 0;
@@ -343,6 +346,16 @@
             active.detail = fmtMoney(s.current) + " saved of " + fmtMoney(s.target) + " target";
             if (!data.next) active.next = "You're " + active.pct + "% of the way to your full 6-month target.";
           }
+        }
+        // focus{} from app.js: display-ready content for the current level
+        if (data.focus && typeof data.focus === "object") {
+          if (typeof data.focus.pct === "number") {
+            active.pct = Math.min(Math.max(data.focus.pct, 0), 100);
+          }
+          if (data.focus.detail) active.detail = data.focus.detail;
+          if (data.focus.next) active.next = data.focus.next;
+        }
+        if (data.savings || data.focus) {
           // Real numbers are in: relabel the sub line (streak stays sample).
           var sub = section.querySelector(".dash-sub");
           if (sub) sub.innerHTML = "Live numbers for <code>user1</code> — the weekly streak stays sample data until the Telegram loop feeds it.";
@@ -359,6 +372,8 @@
       }
       if (typeof data.streakWeeks !== "undefined") setText("streak", data.streakWeeks);
       if (!section.hidden) render();
+      // real level-up from app.js gatekeeping -> existing celebration toast
+      if (typeof data.celebrateLevel === "number") celebrate(data.celebrateLevel);
     }
 
     return { reveal: reveal, update: update, levelUp: levelUp, init: init };

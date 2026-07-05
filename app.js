@@ -86,14 +86,66 @@
   }
 
   /* =================================================================
+     2. LEVEL GATEKEEPING (spec §2) — pure state machine.
+        L1 complete <=> savings >= 3x expenses (3x unlocks; 6x stays
+        the displayed stretch target — documented design decision).
+        L2 complete <=> DTPD >= 9x annual AND CI >= 4x annual AND
+        premium within the 15% cap.
+        L3 reachable only after L1+L2 (MAS sequence); complete when
+        investOk. L4 has no auto-completion (official calculators).
+        Null discipline: missing data can never complete a level.
+        Forward-only: gatekeep() never returns below prevLevel.
+     ================================================================= */
+  function levelCompletion(inputs, derived) {
+    var l1 = isNum(inputs.current_savings) &&
+             isNum(derived.emergencyTargetMin) &&
+             inputs.current_savings >= derived.emergencyTargetMin;
+    var l2 = isNum(inputs.dtpd_coverage_amount) &&
+             isNum(derived.dtpdTarget) &&
+             inputs.dtpd_coverage_amount >= derived.dtpdTarget &&
+             isNum(inputs.critical_illness_coverage_amount) &&
+             isNum(derived.ciTarget) &&
+             inputs.critical_illness_coverage_amount >= derived.ciTarget &&
+             derived.premiumOk === true;
+    var l3 = derived.investOk === true;
+    return { 1: l1, 2: l2, 3: l3, 4: false };
+  }
+
+  function lowestIncomplete(completion) {
+    if (!completion[1]) return 1;
+    if (!completion[2]) return 2;
+    if (!completion[3]) return 3;
+    return 4;
+  }
+
+  function gatekeep(prevLevel, inputs) {
+    var derived = computeAll(inputs);
+    var computed = lowestIncomplete(levelCompletion(inputs, derived));
+    var prev = (isNum(prevLevel) && prevLevel >= 1) ? Math.round(prevLevel) : 1;
+    return Math.max(prev, computed); // forward-only, never auto-demote
+  }
+
+  /* =================================================================
      SELF-TESTS (spec §7.1) — the exact values from the spec + the
      null-discipline edge cases. Logs one PASS/FAIL line on load.
      ================================================================= */
   (function selfTest() {
-    var pass = true;
+    var pass = true, total = 0;
     function check(label, cond) {
+      total++;
       console.assert(cond, "[app.js self-test FAILED] " + label);
       if (!cond) pass = false;
+    }
+    // helper: gatekeep from a fresh level-1 profile
+    function gk(overrides) {
+      var inputs = {
+        monthly_take_home_income: 2800, monthly_expenses: 1400,
+        current_savings: null, monthly_insurance_premium: null,
+        dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+        monthly_investment_amount: null
+      };
+      Object.keys(overrides || {}).forEach(function (k) { inputs[k] = overrides[k]; });
+      return gatekeep(1, inputs);
     }
     // C1: income 2800 / expenses 1400
     check("emergencyTargetFull(1400) === 8400", emergencyTargetFull(1400) === 8400);
@@ -117,8 +169,36 @@
     // clamp + C6 large input
     check("savingsProgressPct(99999, 8400) === 100", savingsProgressPct(99999, 8400) === 100);
     check("fmtSGD(12 * 999999 * 9) formats cleanly", fmtSGD(dtpdTarget(annualIncome(999999))) === "$107,999,892");
+    // Gatekeeping (spec §2): 3x boundary, L2 gates, sequence, forward-only
+    check("G1 savings 4199 (<3x) -> level 1", gk({ current_savings: 4199 }) === 1);
+    check("G2 savings 4200 (=3x) -> level 2", gk({ current_savings: 4200 }) === 2);
+    check("G3 full cover + premium at cap -> level 3", gk({
+      current_savings: 4200, dtpd_coverage_amount: 302400,
+      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 420
+    }) === 3);
+    check("G4 premium above cap blocks L2", gk({
+      current_savings: 4200, dtpd_coverage_amount: 302400,
+      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 421
+    }) === 2);
+    check("G5 investOk after L1+L2 -> level 4", gk({
+      current_savings: 4200, dtpd_coverage_amount: 302400,
+      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 420,
+      monthly_investment_amount: 280
+    }) === 4);
+    check("G6 investOk alone cannot skip the sequence", gk({
+      monthly_investment_amount: 999
+    }) === 1);
+    check("G7 null coverage never completes L2", gk({
+      current_savings: 4200, monthly_insurance_premium: 100
+    }) === 2);
+    check("G8 forward-only: level never demotes", gatekeep(3, {
+      monthly_take_home_income: 2800, monthly_expenses: 1400,
+      current_savings: 100, monthly_insurance_premium: null,
+      dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+      monthly_investment_amount: null
+    }) === 3);
     console.log(pass
-      ? "[app.js] self-tests: PASS (17/17)"
+      ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
       : "[app.js] self-tests: FAIL — see assertions above");
   })();
 
@@ -195,11 +275,57 @@
      Level-aware labels re-render from LEVEL_METRICS via currentLevel
      inside site.js — no label logic here.
      ================================================================= */
-  function pushDashboard() {
+  // Focus-card content for levels 2-4 (level 1 renders from savings{}).
+  // Derivation + formatting live here; site.js only displays the strings.
+  function focusFor(level, inputs, d) {
+    if (level === 2) {
+      if (!isNum(d.dtpdTarget)) {
+        return { pct: 0, detail: "Add your income so your coach can size your cover targets.",
+                 next: "Your Death & TPD and CI targets come from 9x / 4x annual income." };
+      }
+      var c1 = inputs.dtpd_coverage_amount, c2 = inputs.critical_illness_coverage_amount;
+      var pct = (isNum(c1) && isNum(c2))
+        ? Math.min(100, Math.max(0, Math.round(100 * Math.min(c1 / d.dtpdTarget, c2 / d.ciTarget))))
+        : 0;
+      var detail = "Death & TPD " + (isNum(c1) ? fmtSGD(c1) : "—") + " of " + fmtSGD(d.dtpdTarget) +
+                   " · CI " + (isNum(c2) ? fmtSGD(c2) : "—") + " of " + fmtSGD(d.ciTarget);
+      var next;
+      if (d.premiumOk === false) {
+        next = "Your premium is above the 15% guideline — worth a chat with your coach.";
+      } else if (!isNum(inputs.monthly_insurance_premium)) {
+        next = "Add your monthly premium to check the 15% spending cap.";
+      } else {
+        next = "Grow your cover toward the MAS targets — premium is within the cap.";
+      }
+      return { pct: pct, detail: detail, next: next };
+    }
+    if (level === 3) {
+      if (!isNum(d.investMinMonthly)) {
+        return { pct: 0, detail: "Add your income to set your 10% investing floor.",
+                 next: "MAS guidance: invest at least 10% of take-home pay." };
+      }
+      var inv = inputs.monthly_investment_amount;
+      return {
+        pct: isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : 0,
+        detail: isNum(inv)
+          ? fmtSGD(inv) + " of " + fmtSGD(d.investMinMonthly) + " monthly investing target"
+          : "Target " + fmtSGD(d.investMinMonthly) + "/month — add your investing amount.",
+        next: "Invest at least 10% of take-home pay, now that you're protected."
+      };
+    }
+    if (level === 4) {
+      return { pct: 0,
+        detail: "Plan your first home and retirement with the official calculators.",
+        next: "Use the CPF Home Purchase Planner and HDB calculators with your coach." };
+    }
+    return null; // level 1: rendered from savings{}
+  }
+
+  function pushDashboard(celebrateLevel) {
     if (!window.MFC || typeof window.MFC.updateDashboard !== "function") return;
     if (!hasAnyInput()) return; // keep the sample view until real numbers exist
     var d = state.derived;
-    window.MFC.updateDashboard({
+    var payload = {
       currentLevel: state.currentLevel,
       savings: {
         current: state.inputs.current_savings,
@@ -213,18 +339,29 @@
                : id === state.currentLevel ? "current" : "locked"
         };
       })
-    });
+    };
+    var focus = focusFor(state.currentLevel, state.inputs, d);
+    if (focus) payload.focus = focus;
+    if (isNum(celebrateLevel)) payload.celebrateLevel = celebrateLevel;
+    window.MFC.updateDashboard(payload);
   }
 
   function recompute() {
     state.derived = computeAll(state.inputs);
+
+    // Gatekeeping (spec §2): forward-only; celebrate real level-ups only.
+    var prev = state.currentLevel;
+    var next = gatekeep(prev, state.inputs);
+    var leveledUp = next > prev;
+    state.currentLevel = next;
+
     state.lastUpdated = new Date().toISOString();
     saveState();
-    pushDashboard();
-    // Phase 3: gatekeeping state machine
+    pushDashboard(leveledUp ? next - 1 : undefined);
     // Phase 4: Botpress variable push
     console.log("[app.js] recomputed:", JSON.parse(JSON.stringify({
-      inputs: state.inputs, derived: state.derived
+      inputs: state.inputs, derived: state.derived,
+      currentLevel: state.currentLevel, leveledUp: leveledUp
     })));
   }
 
