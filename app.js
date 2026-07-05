@@ -59,23 +59,42 @@
     return monthlyInvestment >= minMonthly;
   }
 
+  // Coverage-cap conflict (CoverageCap_Conflict_Handling.txt Part A):
+  // the user still needs more cover to reach the 9x/4x MAS targets, but
+  // their premium is already at/above the 15% affordability cap.
+  // Null-safe: if any required input (incl. a derived target) is null,
+  // the sub-flag is null and the conflict is false — we never warn on
+  // numbers we don't have.
+  function coverageCapConflict(inputs, dtpdTgt, ciTgt, cap) {
+    var dtpdShortfall = (!isNum(inputs.dtpd_coverage_amount) || !isNum(dtpdTgt))
+      ? null : (inputs.dtpd_coverage_amount < dtpdTgt);
+    var ciShortfall = (!isNum(inputs.critical_illness_coverage_amount) || !isNum(ciTgt))
+      ? null : (inputs.critical_illness_coverage_amount < ciTgt);
+    var premiumAtCap = (!isNum(inputs.monthly_insurance_premium) || !isNum(cap))
+      ? null : (inputs.monthly_insurance_premium >= cap);
+    return (dtpdShortfall === true || ciShortfall === true) && (premiumAtCap === true);
+  }
+
   // Compute every derived value from the 7 raw inputs (nulls propagate).
   function computeAll(inputs) {
     var annual = annualIncome(inputs.monthly_take_home_income);
     var targetFull = emergencyTargetFull(inputs.monthly_expenses);
     var cap = premiumCapMonthly(inputs.monthly_take_home_income);
     var investMin = investMinMonthly(inputs.monthly_take_home_income);
+    var dtpd = dtpdTarget(annual);
+    var ci = ciTarget(annual);
     return {
       emergencyTargetMin:  emergencyTargetMin(inputs.monthly_expenses),
       emergencyTargetFull: targetFull,
       savingsProgressPct:  savingsProgressPct(inputs.current_savings, targetFull),
       annualIncome:        annual,
-      dtpdTarget:          dtpdTarget(annual),
-      ciTarget:            ciTarget(annual),
+      dtpdTarget:          dtpd,
+      ciTarget:            ci,
       premiumCapMonthly:   cap,
       premiumOk:           premiumOk(inputs.monthly_insurance_premium, cap),
       investMinMonthly:    investMin,
-      investOk:            investOk(inputs.monthly_investment_amount, investMin)
+      investOk:            investOk(inputs.monthly_investment_amount, investMin),
+      coverageCapConflict: coverageCapConflict(inputs, dtpd, ci, cap)
     };
   }
 
@@ -197,6 +216,27 @@
       dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
       monthly_investment_amount: null
     }) === 3);
+    // Coverage-cap conflict (CoverageCap_Conflict_Handling.txt Part E)
+    // helper: compute the flag for an income-2500 profile (cap = $375)
+    function ccFlag(o) {
+      var inputs = {
+        monthly_take_home_income: 2500, monthly_expenses: 1000,
+        current_savings: null, monthly_insurance_premium: null,
+        dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+        monthly_investment_amount: null
+      };
+      Object.keys(o || {}).forEach(function (k) { inputs[k] = o[k]; });
+      return computeAll(inputs).coverageCapConflict;
+    }
+    // CC1: under-covered (DTPD 100k < 270k target) AND premium >= 15% cap
+    check("CC1 under-covered + premium at cap -> conflict true",
+      ccFlag({ dtpd_coverage_amount: 100000, monthly_insurance_premium: 400 }) === true);
+    // CC2: fully covered (>= 9x and >= 4x) -> false even with high premium
+    check("CC2 fully covered -> conflict false",
+      ccFlag({ dtpd_coverage_amount: 300000, critical_illness_coverage_amount: 130000, monthly_insurance_premium: 400 }) === false);
+    // CC3: a required field null (premium) -> conflict false, no false alarm
+    check("CC3 null premium -> conflict false",
+      ccFlag({ dtpd_coverage_amount: 100000, monthly_insurance_premium: null }) === false);
     console.log(pass
       ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
       : "[app.js] self-tests: FAIL — see assertions above");
@@ -290,7 +330,9 @@
       var detail = "Death & TPD " + (isNum(c1) ? fmtSGD(c1) : "—") + " of " + fmtSGD(d.dtpdTarget) +
                    " · CI " + (isNum(c2) ? fmtSGD(c2) : "—") + " of " + fmtSGD(d.ciTarget);
       var next;
-      if (d.premiumOk === false) {
+      if (d.coverageCapConflict === true) {
+        next = "Full cover may exceed the 15% guideline — ask your coach.";
+      } else if (d.premiumOk === false) {
         next = "Your premium is above the 15% guideline — worth a chat with your coach.";
       } else if (!isNum(inputs.monthly_insurance_premium)) {
         next = "Add your monthly premium to check the 15% spending cap.";
@@ -319,6 +361,23 @@
         next: "Use the CPF Home Purchase Planner and HDB calculators with your coach." };
     }
     return null; // level 1: rendered from savings{}
+  }
+
+  // Contract 3 (spec §3b + CoverageCap Part B): the SIX Botpress user
+  // variables. Built here and staged for Phase 4's push (init + every
+  // recalculation). Null -> "" per spec ("pass empty"); coverageCapConflict
+  // is a boolean defaulting to false.
+  function botpressUserVars() {
+    var d = state.derived, i = state.inputs;
+    var num = function (v) { return isNum(v) ? v : ""; };
+    return {
+      currentLevel:        state.currentLevel,
+      emergencyTarget:     num(d.emergencyTargetFull),
+      currentSavings:      num(i.current_savings),
+      savingsProgress:     isNum(d.savingsProgressPct) ? (d.savingsProgressPct + "%") : "",
+      insuranceTarget:     num(d.dtpdTarget),
+      coverageCapConflict: d.coverageCapConflict === true   // 6th variable
+    };
   }
 
   function pushDashboard(celebrateLevel) {
@@ -462,8 +521,13 @@
     investMinMonthly: investMinMonthly,
     investOk: investOk,
     computeAll: computeAll,
+    coverageCapConflict: coverageCapConflict,
     fmtSGD: fmtSGD
   };
+
+  // Read-only inspection surface for the staged Contract 3 variables
+  // (Phase 4 will push these to Botpress; exposed now for verification).
+  window.MFC.getUserVars = botpressUserVars;
 
   /* =================================================================
      STARTUP (Phase 2)
