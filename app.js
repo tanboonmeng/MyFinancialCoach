@@ -391,14 +391,13 @@
         in Studio (coverageCapConflict arrives as "true"/"false").
         Pushed on webchat init AND after every recalculation.
      ================================================================= */
-  var bpPushedOnce = false;
+  var bpPushedOnce = false; // updateUser succeeded at least once
+  var bpEventOnce = false;  // mfc_user_data event delivered at least once
 
-  function pushBotpressVars(reason) {
-    var bp = window.botpress;
-    if (!bp || typeof bp.updateUser !== "function") return false;
+  function buildVarStrings() {
     var vars = botpressUserVars();
     var asStr = function (v) { return v === "" ? "" : String(v); };
-    var data = {
+    return {
       currentLevel:        String(vars.currentLevel),
       emergencyTarget:     asStr(vars.emergencyTarget),
       currentSavings:      asStr(vars.currentSavings),
@@ -406,17 +405,48 @@
       insuranceTarget:     asStr(vars.insuranceTarget),
       coverageCapConflict: vars.coverageCapConflict ? "true" : "false"
     };
-    try {
-      bp.updateUser({ data: data });
-      bpPushedOnce = true;
-      console.log("[app.js] Botpress user vars pushed (" + reason + "):", data);
-      return true;
-    } catch (e) {
-      // Quiet while the widget is still starting up (the init/retry
-      // push covers that window); loud only if pushes had worked before.
-      if (bpPushedOnce) console.warn("[app.js] Botpress updateUser failed (" + reason + "):", e);
-      return false;
+  }
+
+  function pushBotpressVars(reason) {
+    var bp = window.botpress;
+    if (!bp) return false;
+    var data = buildVarStrings();
+
+    // Channel 1 — user record (Contract 3 as documented): updateUser.
+    if (typeof bp.updateUser === "function") {
+      try {
+        bp.updateUser({ data: data });
+        bpPushedOnce = true;
+        console.log("[app.js] Botpress user vars pushed (" + reason + "):", data);
+      } catch (e) {
+        // Quiet while the widget is still starting up; loud only if
+        // pushes had worked before.
+        if (bpPushedOnce) console.warn("[app.js] Botpress updateUser failed (" + reason + "):", e);
+      }
     }
+
+    // Channel 2 — conversation event for the Studio Custom Trigger
+    // ("mfc_user_data"): lands bound to the runtime user/conversation,
+    // where an Execute Code card writes the user.* variables directly.
+    // Wire shape (verified): POST /events with
+    //   payload: { type: "custom", data: { type: "mfc_user_data", ... } }
+    // so Studio reads the fields at event.payload.data.*
+    if (typeof bp.sendEvent === "function") {
+      try {
+        var evt = { type: "mfc_user_data" };
+        Object.keys(data).forEach(function (k) { evt[k] = data[k]; });
+        Promise.resolve(bp.sendEvent(evt)).then(function () {
+          bpEventOnce = true;
+          console.log("[app.js] Botpress mfc_user_data event sent (" + reason + "):", evt);
+        }).catch(function (e) {
+          // needs an open conversation; init retries + recalcs cover it
+          if (bpEventOnce) console.warn("[app.js] mfc_user_data event failed (" + reason + "):", e);
+        });
+      } catch (e) {
+        if (bpEventOnce) console.warn("[app.js] mfc_user_data event failed (" + reason + "):", e);
+      }
+    }
+    return bpPushedOnce;
   }
 
   (function wireBotpressPush() {
@@ -426,12 +456,12 @@
       bp.on("webchat:ready", function () { pushBotpressVars("init"); });
       bp.on("webchat:initialized", function () { pushBotpressVars("init"); });
     }
-    // Safety net: if ready fired before we subscribed (or the event
-    // name differs), retry quietly until the first successful push.
+    // Safety net: retry quietly until BOTH channels have delivered once
+    // (the event channel needs the conversation the auto-open creates).
     var tries = 0;
     var timer = setInterval(function () {
       tries++;
-      if (bpPushedOnce || tries > 20) { clearInterval(timer); return; }
+      if ((bpPushedOnce && bpEventOnce) || tries > 20) { clearInterval(timer); return; }
       pushBotpressVars("retry");
     }, 1500);
   })();
