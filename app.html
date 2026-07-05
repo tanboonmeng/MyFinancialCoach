@@ -3,6 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Access gate: the workspace is only reachable after onboarding.
+       If the "unlocked" flag isn't set (set by site.js on "Start coaching",
+       or by the testing "Send" shortcut), send the visitor to onboarding.
+       Runs before render so the page never flashes for a gated visitor. -->
+  <script>
+    (function () {
+      try {
+        if (localStorage.getItem("mfc_onboarded") !== "1") {
+          location.replace("index.html#onboarding");
+        }
+      } catch (e) { /* if storage is blocked, allow through */ }
+    })();
+  </script>
+
   <title>My Financial Coach — your workspace</title>
   <meta name="description" content="Your progress dashboard and coach chat. My Financial Coach by Team Alpha Minds." />
 

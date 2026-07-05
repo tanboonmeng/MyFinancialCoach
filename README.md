@@ -46,8 +46,11 @@ Two pages: a marketing **landing page** and the **workspace app page**.
 ```
 index.html   — landing page (hero, problem, 4-level journey, coach preview,
                onboarding, how it works, footer)
-app.html     — the workspace: progress dashboard + live coach chat, opened
-               from "Start coaching" / "Open app"
+app.html     — the workspace: progress dashboard + live coach chat.
+               GATED: only opens after onboarding ("Start coaching" sets a
+               localStorage unlock flag). A direct visit without it redirects
+               to index.html#onboarding. Testing shortcut: the dummy "Send"
+               button on the landing coach preview unlocks + opens it.
 style.css    — brand tokens (:root) + all custom styling (shared by both pages)
 site.js      — UI behaviour (nav, journey hints, onboarding steps, dashboard)
              — exposes window.MFC as the mount point for Ryan's app.js

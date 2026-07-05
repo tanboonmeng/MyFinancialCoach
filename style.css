@@ -760,7 +760,12 @@ section[id] {
   background: var(--brand);
   padding: 0.5rem 1rem;
   border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-body);
+  transition: background-color 120ms ease;
 }
+.coach-send:hover { background: var(--brand-deep); }
 
 /* ---------- Onboarding flow ---------- */
 .onboard {

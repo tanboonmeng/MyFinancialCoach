@@ -45,7 +45,6 @@
         <a href="#journey" class="nav-link">The journey</a>
         <a href="#coach" class="nav-link">Coach chat</a>
         <a href="#how" class="nav-link">How it works</a>
-        <a href="app.html" class="nav-link">Open app</a>
         <a href="#onboarding" class="btn btn-accent btn-sm">Start your journey</a>
       </div>
     </nav>
@@ -238,7 +237,7 @@
               <li>Won't recommend products or stocks — it points you to a licensed adviser</li>
               <li>Only asks for the basics — never your NRIC, bank details, or passwords</li>
             </ul>
-            <a class="btn btn-accent" href="app.html">Open the coach</a>
+            <a class="btn btn-accent" href="#onboarding">Set up your coach</a>
           </div>
 
           <!-- Native-styled chat window showing a sample conversation.
@@ -263,15 +262,17 @@
               <p class="msg msg-bot">Thanks! Your dashboard will set an emergency-fund target of 3–6 months of expenses, following the MAS guide. Let's build toward it together.</p>
             </div>
 
-            <div class="coach-window-foot" aria-hidden="true">
-              <span class="coach-input-mock">Message your coach…</span>
-              <span class="coach-send">Send</span>
+            <div class="coach-window-foot">
+              <span class="coach-input-mock" aria-hidden="true">Message your coach…</span>
+              <!-- Testing shortcut: opens the (onboarding-gated) workspace
+                   without going through the 3 steps. -->
+              <button class="coach-send" type="button" data-open-app title="Testing: open the workspace">Send</button>
             </div>
           </div>
 
         </div>
 
-        <p class="coach-appnote">This is a preview. The live coach opens in your <a href="app.html">workspace</a>, alongside your progress dashboard.</p>
+        <p class="coach-appnote">This is a preview. <a href="#onboarding">Set up your coach</a> to unlock your live workspace — the real chat, right beside your progress dashboard.</p>
 
       </div>
     </section>
@@ -333,7 +334,7 @@
                 <p class="step-copy">Your weekly check-ins are on. Head to your workspace to enter your numbers and start Level&nbsp;1.</p>
                 <div class="onboard-actions onboard-actions-center">
                   <button class="btn btn-ghost btn-sm" type="button" data-goto="2">Back</button>
-                  <a class="btn btn-accent" href="app.html">Start coaching</a>
+                  <a class="btn btn-accent" href="app.html" data-start-coaching>Start coaching</a>
                 </div>
               </div>
             </div>

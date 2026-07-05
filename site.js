@@ -26,6 +26,16 @@
     }
   };
 
+  /* ---------- Workspace access gate ----------
+     The app page (app.html) is only meant to open AFTER onboarding. We set
+     this flag when the user finishes onboarding ("Start coaching"); app.html
+     redirects to onboarding if it isn't set. The dummy "Send" button on the
+     coach preview also sets it, as a testing shortcut into the workspace. */
+  var ONBOARDED_KEY = "mfc_onboarded";
+  function unlockWorkspace() {
+    try { localStorage.setItem(ONBOARDED_KEY, "1"); } catch (e) { /* private mode */ }
+  }
+
   /* ---------- Mobile nav toggle ---------- */
   var navToggle = document.getElementById("navToggle");
   var navLinks = document.getElementById("navLinks");
@@ -111,8 +121,22 @@
       var goBtn = e.target.closest("[data-goto]");
       if (goBtn) {
         goToStep(Number(goBtn.dataset.goto));
+        return;
       }
-      // "Start coaching" is a link to app.html (the workspace) — no JS needed.
+      // "Start coaching" is an <a> to app.html — unlock the workspace first,
+      // then let the link navigate.
+      if (e.target.closest("[data-start-coaching]")) {
+        unlockWorkspace();
+      }
+    });
+  }
+
+  /* ---------- Testing shortcut: the dummy "Send" opens the workspace ----- */
+  var openAppBtn = document.querySelector("[data-open-app]");
+  if (openAppBtn) {
+    openAppBtn.addEventListener("click", function () {
+      unlockWorkspace();
+      window.location.href = "app.html";
     });
   }
 
