@@ -72,11 +72,12 @@ editing, use VS Code's **Live Server** extension.
 
 ## Placeholders to fill before the demo
 
-- ~~**Sammi** — Botpress embed~~ **DONE** — the live webchat is embedded on
-  `app.html` (official share snippet, floating-bubble mode; see the comment
-  there. Webchat v3.6 ignores the `selector` inline-embed option, so the
-  in-page window stays a styled preview and the "Open live chat" button opens
-  the bubble).
+- ~~**Sammi** — Botpress embed~~ **DONE** — the live webchat is embedded
+  INLINE on `app.html`: one chat, open on page load, no floating bubble.
+  Runtime pinned to webchat v3.3 (v3.6 renders in closed shadow DOM and
+  can't be embedded in a container); the widget node is re-parented into
+  `#mfc-webchat` on ready. Config is copied verbatim from the generated
+  share snippet — see the comment in `app.html` for how to update it.
 - **Ezann** — replace `BOT_USERNAME_PLACEHOLDER` in the Telegram deep link with
   the real bot username from Rainie.
 - **Ryan** — add `app.js` with the MAS calculation logic (mount point is ready).

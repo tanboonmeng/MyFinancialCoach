@@ -151,37 +151,11 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- LIVE COACH CHAT                                            -->
+        <!-- LIVE COACH CHAT — the Botpress webchat renders INLINE here -->
+        <!-- and opens automatically (see embed script at end of file). -->
         <!-- ========================================================= -->
         <aside class="workspace-chat" id="coach" aria-label="Coach chat">
-          <div class="coach-window coach-window-tall">
-            <div class="coach-window-head">
-              <span class="coach-avatar" aria-hidden="true">
-                <svg viewBox="0 0 32 32"><rect x="4" y="18" width="4" height="8" rx="1.2"/><rect x="11" y="14" width="4" height="12" rx="1.2"/><rect x="18" y="10" width="4" height="16" rx="1.2"/><rect x="25" y="6" width="4" height="20" rx="1.2"/></svg>
-              </span>
-              <span class="coach-id">
-                <span class="coach-name">My Financial Coach</span>
-                <span class="coach-status"><span class="status-dot"></span>Grounded in MAS guidance</span>
-              </span>
-              <span class="coach-preview-badge">Preview</span>
-            </div>
-
-            <!-- Sample conversation preview. The LIVE chat is the Botpress
-                 bubble at the bottom-right of this page (see embed note at
-                 the end of this file); the button below opens it. -->
-            <div class="coach-window-body" id="mfc-webchat">
-              <p class="msg msg-bot">Hi! I'm your financial coach. Let's start with Level 1 — roughly how much do you take home each month?</p>
-              <p class="msg msg-user">About $2,800.</p>
-              <p class="msg msg-bot">Got it — $2,800 take-home each month. And what are your monthly expenses?</p>
-              <p class="msg msg-user">Around $1,400.</p>
-              <p class="msg msg-bot">Thanks! Your dashboard will set an emergency-fund target of 3–6 months of expenses, following the MAS guide. Let's build toward it together.</p>
-            </div>
-
-            <div class="coach-window-foot coach-window-foot-live">
-              <span class="coach-live-note"><span class="status-dot"></span>Your live coach opens at the bottom-right of this page.</span>
-              <button class="btn btn-accent btn-sm" type="button" data-open-coach>Open live chat</button>
-            </div>
-          </div>
+          <div id="mfc-webchat" class="workspace-embed"></div>
         </aside>
 
       </div>
@@ -189,28 +163,93 @@
   </main>
 
   <!-- ============================================================
-       LIVE BOTPRESS WEBCHAT — official share snippet, floating mode.
-       Note (verified 2026-07-05): webchat v3.6 renders in shadow DOM at
-       body level and ignores the "selector" init option, so the inline
-       container embed documented for earlier versions (.bpWebchat/.bpFab
-       CSS) does not work here. The chat therefore opens as the standard
-       bottom-right bubble; the #mfc-webchat window above stays as a
-       styled preview panel with an "Open live chat" action.
-       SAMMI: if you regenerate the snippet in Botpress Studio, just
-       replace the second <script> URL below.
+       LIVE BOTPRESS WEBCHAT — embedded INLINE in #mfc-webchat.
+       Uses webchat v3.3, the version Botpress's "Embed in a custom
+       container" docs support (v3.6 renders in shadow DOM at body level
+       and ignores the selector option — verified 2026-07-05, which is
+       why the runtime is pinned to v3.3 here).
+       The init object below is Sammi's generated config, copied verbatim
+       from https://files.bpcontent.cloud/2026/07/04/04/20260704045157-J01PYF0L.js
+       with ONE addition: selector: "#mfc-webchat".
+       SAMMI: if you regenerate the snippet in Botpress Studio, replace
+       the init object below with the new file's contents and keep the
+       selector line.
        ============================================================ -->
-  <script src="https://cdn.botpress.cloud/webchat/v3.6/inject.js"></script>
-  <script src="https://files.bpcontent.cloud/2026/07/04/04/20260704045157-J01PYF0L.js" defer></script>
+  <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
   <script>
-    // Flip the preview badge to "Live" once the webchat is ready.
     (function () {
-      if (!window.botpress || typeof window.botpress.on !== "function") return;
-      function markLive() {
-        var badge = document.querySelector(".coach-preview-badge");
-        if (badge) badge.textContent = "Live";
+      if (!window.botpress || typeof window.botpress.init !== "function") return;
+
+      window.botpress.init({
+        "botId": "ae7f97d0-1d27-40d4-827b-30077dd61c64",
+        "clientId": "69779f1d-ebc2-4f5a-b985-406d58000554",
+        "selector": "#mfc-webchat",
+        "configuration": {
+          "version": "v2",
+          "composerPlaceholder": "Ask me about saving, insurance, or your next step...",
+          "botName": "My Financial Coach",
+          "botAvatar": "https://files.bpcontent.cloud/2026/07/05/05/20260705050727-UPI26K3Q.png",
+          "botDescription": "Your MAS-benchmarked financial coach — one level at a time.",
+          "website": {},
+          "email": {},
+          "phone": {},
+          "termsOfService": {},
+          "privacyPolicy": {},
+          "color": "#0E7C66",
+          "variant": "solid",
+          "headerVariant": "solid",
+          "themeMode": "light",
+          "fontFamily": "Bricolage Grotesque",
+          "radius": 4,
+          "feedbackEnabled": false,
+          "footer": "[⚡ by Botpress](https://botpress.com/?from=webchat)",
+          "soundEnabled": false,
+          "proactiveMessageEnabled": false,
+          "proactiveBubbleMessage": "Hi! 👋 Need help?",
+          "proactiveBubbleTriggerType": "afterDelay",
+          "proactiveBubbleDelayTime": 10,
+          "conversationHistory": false,
+          "homePageEnabled": false,
+          "mainCardEnabled": false,
+          "conversationStartersEnabled": false,
+          "conversationStarters": [],
+          "conversationStartersDisplayStyle": "cards"
+        }
+      });
+
+      // v3.3 ignores the selector option and mounts the widget at body
+      // level (light DOM), so on ready we move the widget node into
+      // #mfc-webchat, hide the floating bubble, and open the chat — the
+      // result is ONE inline chat, live on page load, no click needed.
+      var embedded = false;
+      function embedInline() {
+        if (embedded) return;
+        var mount = document.getElementById("mfc-webchat");
+        var widget = document.querySelector(".bpWebchat");
+        if (!mount || !widget) return;
+        mount.appendChild(widget);
+        ["bpFabWrapper", "bpMessagePreview"].forEach(function (cls) {
+          var el = document.querySelector("." + cls);
+          if (el) el.style.display = "none";
+        });
+        embedded = true;
+        try { window.botpress.open(); } catch (e) { /* non-fatal */ }
       }
-      window.botpress.on("webchat:ready", markLive);
-      window.botpress.on("webchat:initialized", markLive);
+      if (typeof window.botpress.on === "function") {
+        window.botpress.on("webchat:ready", embedInline);
+        window.botpress.on("webchat:initialized", embedInline);
+        // The inline chat is a fixed part of the workspace — if it gets
+        // closed (widget X button), reopen it.
+        window.botpress.on("webchat:closed", function () {
+          if (embedded) setTimeout(function () {
+            try { window.botpress.open(); } catch (e) {}
+          }, 150);
+        });
+      }
+      // Safety net: a click on an empty chat panel reopens the widget.
+      document.getElementById("mfc-webchat").addEventListener("click", function () {
+        if (embedded) { try { window.botpress.open(); } catch (e) {} }
+      });
     })();
   </script>
 

@@ -1260,20 +1260,25 @@ section[id] {
   overflow-y: auto;
 }
 
-/* Live-chat bar under the preview window (the live Botpress widget is the
-   floating bubble; this bar opens it via window.botpress.open()). */
-.coach-window-foot-live {
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+/* Inline Botpress embed (app.html). The widget renders inside #mfc-webchat;
+   these are the overrides from the official "embed in a custom container"
+   docs — container plumbing only, the widget's branding is set in Botpress. */
+.workspace-embed {
+  height: min(70vh, 40rem);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 44px rgba(10, 87, 72, 0.14);
+  overflow: hidden;
 }
-.coach-live-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.85rem;
-  color: var(--ink-soft);
+#mfc-webchat .bpWebchat {
+  position: unset;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  max-width: 100%;
 }
+#mfc-webchat .bpFab { display: none; }
 
 @media (max-width: 480px) {
   .chip-label { display: none; }
