@@ -152,18 +152,36 @@
     var CIRCUMFERENCE = 326.7; // 2 * pi * r, r = 52
     var CHECK_SVG = '<svg viewBox="0 0 24 24" style="width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>';
 
+    // Level-aware framing for the consistency metric + hero caption. One
+    // check-in mechanic, but the label/unit/benchmark switch with the level
+    // so the metric always describes progress toward the CURRENT goal.
+    var LEVEL_METRICS = {
+      1: { consistencyLabel: "Check-ins on track",
+           consistencyUnit:  "saving check-ins",
+           heroCaption:      "MAS benchmark · 3–6 months of expenses" },
+      2: { consistencyLabel: "Steps on track",
+           consistencyUnit:  "protection steps",
+           heroCaption:      "MAS benchmark · 9x / 4x annual income cover" },
+      3: { consistencyLabel: "Contributions on track",
+           consistencyUnit:  "contributions",
+           heroCaption:      "MAS benchmark · invest at least 10% of take-home pay" },
+      4: { consistencyLabel: "Milestones on track",
+           consistencyUnit:  "milestones",
+           heroCaption:      "Plan with official HDB/CPF calculators" }
+    };
+
     // Sample per-level state. Ryan overwrites the active level via updateDashboard().
     var levels = [
-      { title: "Emergency fund", benchmark: "3–6 months of expenses", pct: 59,
+      { title: "Emergency fund", pct: 59,
         detail: "$4,956 saved of $8,400 sample target",
         next: "You're 59% there — keep going to unlock insurance." },
-      { title: "Insurance protection", benchmark: "9x / 4x annual income cover", pct: 8,
+      { title: "Insurance protection", pct: 8,
         detail: "Just getting started on protection.",
         next: "Set up your income protection to grow your safety net." },
-      { title: "Investing", benchmark: "≥10% of take-home pay", pct: 0,
+      { title: "Investing", pct: 0,
         detail: "Unlocks once you're protected.",
         next: "Invest at least 10% of take-home pay — after Levels 1–2." },
-      { title: "Home & retirement", benchmark: "Plan with official calculators", pct: 0,
+      { title: "Home & retirement", pct: 0,
         detail: "The big-picture planning stage.",
         next: "Plan your first home and retirement with official tools." }
     ];
@@ -180,12 +198,17 @@
       var cur = state.currentLevel;
       var doneCount = state.allComplete ? levels.length : cur - 1;
 
+      // Level-aware framing (label + unit + benchmark caption) from the map.
+      var metric = LEVEL_METRICS[state.allComplete ? levels.length : cur];
+      setText("consistency-label", metric.consistencyLabel);
+      setText("consistency-unit", metric.consistencyUnit);
+
       if (state.allComplete) {
         setText("level", levels.length);
         setText("level-title", "All levels complete");
-        setText("benchmark", "You've built the full plan");
+        setText("hero-caption", "You've built the full plan");
         setText("detail", "You've completed all four levels — brilliant work.");
-        setText("next", "Keep your streak going with your weekly check-ins.");
+        setText("next", "Keep your weekly check-ins going.");
         setText("pct", "100%");
         var ringDone = get("ring");
         if (ringDone) ringDone.style.strokeDashoffset = "0";
@@ -193,7 +216,7 @@
         var lvl = levels[cur - 1];
         setText("level", cur);
         setText("level-title", lvl.title);
-        setText("benchmark", lvl.benchmark);
+        setText("hero-caption", metric.heroCaption);
         setText("detail", lvl.detail);
         setText("next", lvl.next);
         setText("pct", lvl.pct + "%");
