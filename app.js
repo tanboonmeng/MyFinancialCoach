@@ -380,6 +380,62 @@
     };
   }
 
+  /* =================================================================
+     4. BOTPRESS VARIABLE PUSH (Contract 3 §3b + coverageCapConflict)
+        Method: window.botpress.updateUser({ data: {...} }) — the
+        webchat client's user-data API from the existing v3.3 inject
+        embed. Values travel as STRINGS (webchat user data is a
+        string map); null -> "" per spec 3b ("pass empty" — coach v4
+        handles the not-entered case). The bot reads them as
+        {{user.currentLevel}} etc. once Sammi maps the user variables
+        in Studio (coverageCapConflict arrives as "true"/"false").
+        Pushed on webchat init AND after every recalculation.
+     ================================================================= */
+  var bpPushedOnce = false;
+
+  function pushBotpressVars(reason) {
+    var bp = window.botpress;
+    if (!bp || typeof bp.updateUser !== "function") return false;
+    var vars = botpressUserVars();
+    var asStr = function (v) { return v === "" ? "" : String(v); };
+    var data = {
+      currentLevel:        String(vars.currentLevel),
+      emergencyTarget:     asStr(vars.emergencyTarget),
+      currentSavings:      asStr(vars.currentSavings),
+      savingsProgress:     vars.savingsProgress,
+      insuranceTarget:     asStr(vars.insuranceTarget),
+      coverageCapConflict: vars.coverageCapConflict ? "true" : "false"
+    };
+    try {
+      bp.updateUser({ data: data });
+      bpPushedOnce = true;
+      console.log("[app.js] Botpress user vars pushed (" + reason + "):", data);
+      return true;
+    } catch (e) {
+      // Quiet while the widget is still starting up (the init/retry
+      // push covers that window); loud only if pushes had worked before.
+      if (bpPushedOnce) console.warn("[app.js] Botpress updateUser failed (" + reason + "):", e);
+      return false;
+    }
+  }
+
+  (function wireBotpressPush() {
+    var bp = window.botpress;
+    if (!bp) return; // page without the webchat embed (e.g. index.html)
+    if (typeof bp.on === "function") {
+      bp.on("webchat:ready", function () { pushBotpressVars("init"); });
+      bp.on("webchat:initialized", function () { pushBotpressVars("init"); });
+    }
+    // Safety net: if ready fired before we subscribed (or the event
+    // name differs), retry quietly until the first successful push.
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries++;
+      if (bpPushedOnce || tries > 20) { clearInterval(timer); return; }
+      pushBotpressVars("retry");
+    }, 1500);
+  })();
+
   function pushDashboard(celebrateLevel) {
     if (!window.MFC || typeof window.MFC.updateDashboard !== "function") return;
     if (!hasAnyInput()) return; // keep the sample view until real numbers exist
@@ -417,7 +473,7 @@
     state.lastUpdated = new Date().toISOString();
     saveState();
     pushDashboard(leveledUp ? next - 1 : undefined);
-    // Phase 4: Botpress variable push
+    pushBotpressVars("recalc"); // Contract 3: after every recalculation
     console.log("[app.js] recomputed:", JSON.parse(JSON.stringify({
       inputs: state.inputs, derived: state.derived,
       currentLevel: state.currentLevel, leveledUp: leveledUp
