@@ -408,6 +408,23 @@
         check("M4 optional A4 becomes current only after all non-optional done",
           naAfter !== null && naAfter.id === "L1-A4");
       })();
+      // Fund-note (post-L1 progress visibility): exact string, null-safe
+      (function () {
+        var in5000 = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+          current_savings: 5000, monthly_insurance_premium: null,
+          dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+          monthly_investment_amount: null };
+        var d5000 = computeAll(in5000);
+        check("F1 fund note at level 2 reads 60% of $8,400",
+          fundProgressNote(d5000, 2) === "Unlocked at 3× — fund 60% of $8,400");
+        check("F2 fund note null while still on level 1",
+          fundProgressNote(d5000, 1) === null);
+        var dNull = computeAll({ monthly_take_home_income: null, monthly_expenses: null,
+          current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
+          critical_illness_coverage_amount: null, monthly_investment_amount: null });
+        check("F3 fund note null-safe on missing inputs",
+          fundProgressNote(dNull, 2) === null);
+      })();
       var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
         current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
         critical_illness_coverage_amount: null, monthly_investment_amount: null },
@@ -685,12 +702,22 @@
     }
   }
 
+  // UX note for the completed Level 1 rows: L1 unlocks at 3x expenses,
+  // but the 6x stretch target keeps filling — keep that progress visible
+  // so "Done" is never mistaken for "fund complete". Null-safe.
+  function fundProgressNote(d, currentLevel) {
+    if (currentLevel <= 1) return null;
+    if (!isNum(d.savingsProgressPct) || !isNum(d.emergencyTargetFull)) return null;
+    return "Unlocked at 3× — fund " + d.savingsProgressPct + "% of " + fmtSGD(d.emergencyTargetFull);
+  }
+
   function pushDashboard(celebrateLevel) {
     if (!window.MFC || typeof window.MFC.updateDashboard !== "function") return;
     if (!hasAnyInput()) return; // keep the sample view until real numbers exist
     var d = state.derived;
     var payload = {
       currentLevel: state.currentLevel,
+      fundNote: fundProgressNote(d, state.currentLevel),
       savings: {
         current: state.inputs.current_savings,
         target: isNum(d.emergencyTargetFull) ? d.emergencyTargetFull : null,
@@ -843,8 +870,10 @@
     var doneHtml = "", lockedHtml = "";
     for (var n = 1; n <= 4; n++) {
       if (n < cur) {
+        var note = (n === 1) ? fundProgressNote(state.derived, cur) : null;
         doneHtml += '<li class="plan-lvl is-done"><span class="plan-lvl-check">' + CHECK_PATH +
-                    '</span>Level ' + n + " · " + PLAN_TITLES[n] + '<span class="plan-lvl-tag">Done</span></li>';
+                    '</span>Level ' + n + " · " + PLAN_TITLES[n] + '<span class="plan-lvl-tag">Done</span>' +
+                    (note ? '<span class="plan-lvl-note">' + note + '</span>' : '') + '</li>';
       } else if (n > cur) {
         lockedHtml += '<li class="plan-lvl is-locked">Level ' + n + " · " + PLAN_TITLES[n] +
                       '<span class="plan-lvl-tag">Locked</span></li>';

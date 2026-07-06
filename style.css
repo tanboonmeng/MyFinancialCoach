@@ -1315,11 +1315,18 @@ section[id] {
 .plan-lvl {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.55rem;
   font-size: 0.85rem;
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
+}
+.plan-lvl-note {
+  flex-basis: 100%;
+  padding-left: 1.55rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
 }
 .plan-lvl.is-done { color: var(--brand-deep); background: var(--brand-tint); border-color: var(--brand-tint); }
 .plan-lvl.is-locked { color: var(--lock); background: #FBFCFC; border-style: dashed; }

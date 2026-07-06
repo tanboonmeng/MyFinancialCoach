@@ -243,7 +243,16 @@
         var status = li.querySelector(".dash-lvl-status");
         // an explicit levels[] payload (spec §3c) wins over derivation
         var st = override ? override[n] : null;
-        if (st === "done" || (!st && (state.allComplete || n < cur))) {
+        // L1's bench line shows live fund progress once the level is done
+        // ("Unlocked at 3× — fund 60% of $8,400"); default text otherwise.
+        var bench = li.querySelector(".dash-lvl-bench");
+        if (bench && !bench.dataset.defaultText) bench.dataset.defaultText = bench.textContent;
+        var isDone = st === "done" || (!st && (state.allComplete || n < cur));
+        if (bench) {
+          bench.textContent = (n === 1 && isDone && state.fundNote)
+            ? state.fundNote : bench.dataset.defaultText;
+        }
+        if (isDone) {
           li.classList.add("is-done");
           badge.innerHTML = CHECK_SVG;
           status.textContent = "Done";
@@ -324,6 +333,7 @@
         state.currentLevel = 1;
         state.allComplete = false;
         state.levelOverride = null;
+        state.fundNote = null;
         var l1 = levels[0];
         l1.pct = 0;
         l1.detail = "Enter your numbers below to see your emergency-fund progress.";
@@ -392,6 +402,9 @@
           if (l && typeof l.id === "number") state.levelOverride[l.id] = l.state;
         });
       }
+      // live fund-progress note for the completed Level 1 row (app.js owns
+      // the value; null clears it)
+      if ("fundNote" in data) state.fundNote = data.fundNote || null;
       if (typeof data.streakCount !== "undefined" && data.streakCount !== null) {
         setText("streak", data.streakCount);
       }
