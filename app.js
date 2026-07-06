@@ -195,6 +195,10 @@
       var a4 = act("L1-A4", "(Optional, once your buffer grows) Move a portion into Singapore Savings Bonds (SSBs) — government-guaranteed and exitable any month — to earn more while staying liquid.");
       a4.optional = true;
       plan.actions = [
+        // Protection awareness leads the plan (team decision 2026-07-06):
+        // the MAS sequence keeps the fund as Level 1, but baseline cover
+        // in SG is automatic — knowing that is the true first action.
+        act("L1-A0", "Know your baseline protection — MediShield Life covers you automatically, and DPS is extended with your first CPF working contribution."),
         act("L1-A1", "Open a high-yield savings account as your emergency-fund home."),
         act("L1-A2", "Set up an automatic " + fmtSGD(suggestedMonthly) + " transfer on payday into that savings account.", suggestedMonthly),
         a3,
@@ -365,23 +369,26 @@
         monthly_investment_amount: null
       };
       var p = generatePlan({ inputs: inputs, derived: computeAll(inputs), currentLevel: 1, actions: {} });
-      check("P1 plan ready (4 actions incl. optional SSB)", p.ready === true && p.actions.length === 4);
+      check("P1 plan ready (5 actions incl. protection lead + optional SSB)", p.ready === true && p.actions.length === 5);
+      check("P0 baseline-protection action leads the Level 1 plan",
+        p.actions[0].id === "L1-A0" && !p.actions[0].optional &&
+        p.actions[0].text.indexOf("MediShield") !== -1);
       check("P1 target6 8400", p.meta.target6 === 8400);
       check("P1 shortfall 3444", p.meta.shortfall === 3444);
       check("P1 suggestedMonthly 300 (nearest-$50 of min(287,560))", p.meta.suggestedMonthly === 300);
       check("P1 monthsToTarget 12", p.meta.monthsToTarget === 12);
-      check("P1 A2 renders $300", p.actions[1].text.indexOf("$300") !== -1);
+      check("P1 A2 renders $300", p.actions[2].text.indexOf("$300") !== -1);
       check("P1 A3 renders $8,400 and 12 months",
-        p.actions[2].text.indexOf("$8,400") !== -1 && p.actions[2].text.indexOf("12 months") !== -1);
+        p.actions[3].text.indexOf("$8,400") !== -1 && p.actions[3].text.indexOf("12 months") !== -1);
       check("P1 A4 is the optional SSB step",
-        p.actions[3].id === "L1-A4" &&
-        p.actions[3].text.indexOf("Optional") !== -1 &&
-        p.actions[3].text.indexOf("Singapore Savings Bonds") !== -1 &&
-        p.actions[3].amount === null);
+        p.actions[4].id === "L1-A4" &&
+        p.actions[4].text.indexOf("Optional") !== -1 &&
+        p.actions[4].text.indexOf("Singapore Savings Bonds") !== -1 &&
+        p.actions[4].amount === null);
       check("P1 auto-transfer binds to the savings account only",
-        p.actions[1].text.indexOf("savings account") !== -1 &&
-        p.actions[1].text.indexOf("SSB") === -1 &&
-        p.actions[3].text.indexOf("automatic") === -1);
+        p.actions[2].text.indexOf("savings account") !== -1 &&
+        p.actions[2].text.indexOf("SSB") === -1 &&
+        p.actions[4].text.indexOf("automatic") === -1);
       // M-series: A3 auto-milestone + focus selection
       (function () {
         function st(savings, actions) {
@@ -394,17 +401,17 @@
           return generatePlan({ inputs: inputs, derived: computeAll(inputs),
                                 currentLevel: 1, actions: actions || {} });
         }
-        var p36 = st(3024, { "L1-A1": "done", "L1-A2": "done" }); // 3024/8400 = 36%
+        var p36 = st(3024, { "L1-A0": "done", "L1-A1": "done", "L1-A2": "done" }); // 3024/8400 = 36%
         check("M1 A3 is an auto milestone, not done below 100%",
-          p36.actions[2].auto === true && p36.actions[2].status !== "done" &&
-          p36.actions[2].progressPct === 36);
+          p36.actions[3].auto === true && p36.actions[3].status !== "done" &&
+          p36.actions[3].progressPct === 36);
         var p100 = st(8399, {});                                  // rounds to 100%, shortfall $1
         check("M2 A3 auto-done at 100% live progress",
-          p100.ready === true && p100.actions[2].status === "done");
+          p100.ready === true && p100.actions[3].status === "done");
         var na36 = nextAction(p36);
         check("M3 current action is A3 (never A4) while A3 incomplete",
           na36 !== null && na36.id === "L1-A3" && na36.id !== "L1-A4");
-        var naAfter = nextAction(st(8399, { "L1-A1": "done", "L1-A2": "done" }));
+        var naAfter = nextAction(st(8399, { "L1-A0": "done", "L1-A1": "done", "L1-A2": "done" }));
         check("M4 optional A4 becomes current only after all non-optional done",
           naAfter !== null && naAfter.id === "L1-A4");
       })();
