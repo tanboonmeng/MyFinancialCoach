@@ -1109,6 +1109,31 @@ section[id] {
 }
 .dash-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
+/* emergency-fund tracker bar (focus card, visible after L1 unlocks) */
+.dash-fundbar { margin-bottom: 1.2rem; }
+.dash-fundbar-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--brand-deep);
+  margin-bottom: 0.4rem;
+}
+.dash-fundbar-track {
+  height: 0.5rem;
+  background: var(--brand-tint);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.dash-fundbar-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brand), var(--brand-deep));
+  transition: width 600ms ease;
+}
+
 /* level tracker */
 .dash-track-title,
 .dash-focus .dash-track-title {

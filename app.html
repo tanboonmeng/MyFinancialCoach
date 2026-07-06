@@ -99,6 +99,13 @@
                 </div>
               </div>
 
+              <!-- Emergency-fund tracker: stays visible after L1 unlocks at 3x,
+                   so the fund's progress toward the 6x target never disappears -->
+              <div class="dash-fundbar" data-dash="fundbar" hidden>
+                <span class="dash-fundbar-label">Emergency fund · <span data-dash="fundbar-pct">0%</span> of <span data-dash="fundbar-target">$0</span></span>
+                <div class="dash-fundbar-track"><div class="dash-fundbar-fill" data-dash="fundbar-fill"></div></div>
+              </div>
+
               <div class="dash-actions">
                 <button class="btn btn-ghost btn-sm" type="button" data-levelup>Preview a level-up (demo)</button>
               </div>

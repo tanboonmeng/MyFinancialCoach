@@ -219,6 +219,21 @@
         if (state.fundNote) fundNoteEl.textContent = state.fundNote;
       }
 
+      // Focus-card emergency-fund tracker bar: visible past Level 1 so the
+      // fund's 6x progress keeps its visual tracker (values from app.js).
+      var fb = get("fundbar");
+      if (fb) {
+        var showBar = (state.allComplete || cur > 1) &&
+          typeof state.fundPct === "number" && typeof state.fundTarget === "number";
+        fb.hidden = !showBar;
+        if (showBar) {
+          setText("fundbar-pct", state.fundPct + "%");
+          setText("fundbar-target", fmtMoney(state.fundTarget));
+          var fill = get("fundbar-fill");
+          if (fill) fill.style.width = Math.min(100, Math.max(0, state.fundPct)) + "%";
+        }
+      }
+
       if (state.allComplete) {
         setText("level", levels.length);
         setText("level-title", "All levels complete");
@@ -342,6 +357,8 @@
         state.allComplete = false;
         state.levelOverride = null;
         state.fundNote = null;
+        state.fundPct = null;
+        state.fundTarget = null;
         var l1 = levels[0];
         l1.pct = 0;
         l1.detail = "Enter your numbers below to see your emergency-fund progress.";
@@ -413,6 +430,11 @@
       // live fund-progress note for the completed Level 1 row (app.js owns
       // the value; null clears it)
       if ("fundNote" in data) state.fundNote = data.fundNote || null;
+      // raw fund numbers for the focus card's emergency-fund tracker bar
+      if (data.savings && typeof data.savings === "object") {
+        state.fundPct = (typeof data.savings.pct === "number") ? data.savings.pct : null;
+        state.fundTarget = (typeof data.savings.target === "number") ? data.savings.target : null;
+      }
       if (typeof data.streakCount !== "undefined" && data.streakCount !== null) {
         setText("streak", data.streakCount);
       }
