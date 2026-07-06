@@ -424,6 +424,17 @@
           critical_illness_coverage_amount: null, monthly_investment_amount: null });
         check("F3 fund note null-safe on missing inputs",
           fundProgressNote(dNull, 2) === null);
+        // Ring honesty: no cover data -> pct null (ring "—"), never a false 0%
+        var noCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+          current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: null,
+          critical_illness_coverage_amount: null, monthly_investment_amount: null };
+        check("F4 L2 focus pct is null with no cover data",
+          focusFor(2, noCover, computeAll(noCover)).pct === null);
+        var withCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+          current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: 100000,
+          critical_illness_coverage_amount: 50000, monthly_investment_amount: null };
+        check("F5 L2 focus pct numeric once both covers entered",
+          focusFor(2, withCover, computeAll(withCover)).pct === 33);
       })();
       var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
         current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
@@ -529,9 +540,11 @@
                  next: "Your Death & TPD and CI targets come from 9x / 4x annual income." };
       }
       var c1 = inputs.dtpd_coverage_amount, c2 = inputs.critical_illness_coverage_amount;
+      // pct is NULL (ring shows "—") until BOTH covers are entered —
+      // no data is not the same as 0% cover (null discipline).
       var pct = (isNum(c1) && isNum(c2))
         ? Math.min(100, Math.max(0, Math.round(100 * Math.min(c1 / d.dtpdTarget, c2 / d.ciTarget))))
-        : 0;
+        : null;
       var detail = "Death & TPD " + (isNum(c1) ? fmtSGD(c1) : "—") + " of " + fmtSGD(d.dtpdTarget) +
                    " · CI " + (isNum(c2) ? fmtSGD(c2) : "—") + " of " + fmtSGD(d.ciTarget);
       var next;
@@ -553,7 +566,7 @@
       }
       var inv = inputs.monthly_investment_amount;
       return {
-        pct: isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : 0,
+        pct: isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : null,
         detail: isNum(inv)
           ? fmtSGD(inv) + " of " + fmtSGD(d.investMinMonthly) + " monthly investing target"
           : "Target " + fmtSGD(d.investMinMonthly) + "/month — add your investing amount.",
@@ -561,7 +574,7 @@
       };
     }
     if (level === 4) {
-      return { pct: 0,
+      return { pct: null,   // no numeric target — official calculators own this
         detail: "Plan your first home and retirement with the official calculators.",
         next: "Use the CPF Home Purchase Planner and HDB calculators with your coach." };
     }

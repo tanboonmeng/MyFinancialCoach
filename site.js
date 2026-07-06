@@ -250,9 +250,13 @@
         setText("hero-caption", metric.heroCaption);
         setText("detail", lvl.detail);
         setText("next", lvl.next);
-        setText("pct", lvl.pct + "%");
+        // pct null = no data for this level yet: show "—", empty ring
+        var hasPct = typeof lvl.pct === "number";
+        setText("pct", hasPct ? lvl.pct + "%" : "—");
         var ring = get("ring");
-        if (ring) ring.style.strokeDashoffset = (CIRCUMFERENCE * (1 - lvl.pct / 100)).toFixed(1);
+        if (ring) ring.style.strokeDashoffset = hasPct
+          ? (CIRCUMFERENCE * (1 - lvl.pct / 100)).toFixed(1)
+          : String(CIRCUMFERENCE);
       }
 
       setText("completed", doneCount);
@@ -407,10 +411,13 @@
             if (!data.next) active.next = "You're " + active.pct + "% of the way to your full 6-month target.";
           }
         }
-        // focus{} from app.js: display-ready content for the current level
+        // focus{} from app.js: display-ready content for the current level.
+        // pct null means "no data yet" -> ring renders "—", never a false 0%.
         if (data.focus && typeof data.focus === "object") {
           if (typeof data.focus.pct === "number") {
             active.pct = Math.min(Math.max(data.focus.pct, 0), 100);
+          } else if (data.focus.pct === null) {
+            active.pct = null;
           }
           if (data.focus.detail) active.detail = data.focus.detail;
           if (data.focus.next) active.next = data.focus.next;
