@@ -105,44 +105,15 @@
   }
 
   /* =================================================================
-     2. LEVEL GATEKEEPING (spec §2) — pure state machine.
-        L1 complete <=> savings >= 3x expenses (3x unlocks; 6x stays
-        the displayed stretch target — documented design decision).
-        L2 complete <=> DTPD >= 9x annual AND CI >= 4x annual AND
-        premium within the 15% cap.
-        L3 reachable only after L1+L2 (MAS sequence); complete when
-        investOk. L4 has no auto-completion (official calculators).
-        Null discipline: missing data can never complete a level.
-        Forward-only: gatekeep() never returns below prevLevel.
+     2. LEVEL GATEKEEPING — ITEMS-BASED (team ruling 2026-07-06).
+        A level is complete when EVERY action in it is done: see
+        levelComplete() and deriveCurrentLevel() below the plan
+        builders. The former numeric trio (levelCompletion/
+        lowestIncomplete/gatekeep) is retired; the 3x savings threshold
+        now lives inside item L1-A3's auto-completion, latched into the
+        persisted status map (no-demote). Forward-only preserved:
+        statuses are monotone, so the derived level can only rise.
      ================================================================= */
-  function levelCompletion(inputs, derived) {
-    var l1 = isNum(inputs.current_savings) &&
-             isNum(derived.emergencyTargetMin) &&
-             inputs.current_savings >= derived.emergencyTargetMin;
-    var l2 = isNum(inputs.dtpd_coverage_amount) &&
-             isNum(derived.dtpdTarget) &&
-             inputs.dtpd_coverage_amount >= derived.dtpdTarget &&
-             isNum(inputs.critical_illness_coverage_amount) &&
-             isNum(derived.ciTarget) &&
-             inputs.critical_illness_coverage_amount >= derived.ciTarget &&
-             derived.premiumOk === true;
-    var l3 = derived.investOk === true;
-    return { 1: l1, 2: l2, 3: l3, 4: false };
-  }
-
-  function lowestIncomplete(completion) {
-    if (!completion[1]) return 1;
-    if (!completion[2]) return 2;
-    if (!completion[3]) return 3;
-    return 4;
-  }
-
-  function gatekeep(prevLevel, inputs) {
-    var derived = computeAll(inputs);
-    var computed = lowestIncomplete(levelCompletion(inputs, derived));
-    var prev = (isNum(prevLevel) && prevLevel >= 1) ? Math.round(prevLevel) : 1;
-    return Math.max(prev, computed); // forward-only, never auto-demote
-  }
 
   /* =================================================================
      ACTION PLAN GENERATOR (Plan -> Do -> Check) — DETERMINISTIC ONLY.
@@ -153,116 +124,135 @@
      Action ids are stable (L1-A1...) so statuses persist in
      mfc_state_v1 across regenerations.
      ================================================================= */
-  function generatePlan(st) {
+  // buildLevel(n, st): the data-driven level model. Fixed action lists,
+  // three completion types:
+  //   attest — user-set via Mark started / Mark done
+  //   auto   — derived from numbers; manual writes refused (L1-A3 only:
+  //            completes at 3x expenses, latched in recompute())
+  //   learn  — "Open coach" + "Mark as learned"; persisted boolean
+  function buildLevel(n, st) {
     var i = st.inputs, d = st.derived || computeAll(st.inputs);
-    var lvl = st.currentLevel || 1;
     var statuses = st.actions || {};
-    function act(id, text, amount) {
-      return { id: id, text: text, level: lvl,
+    function act(id, text, type, amount, coachTopic) {
+      return { id: id, text: text, level: n,
+               type: type || "attest",
                status: statuses[id] || "not_started",
-               amount: isNum(amount) ? amount : null };
+               amount: isNum(amount) ? amount : null,
+               coachTopic: coachTopic || null };
     }
-    var plan = { level: lvl, ready: true, complete: false, actions: [] };
 
-    if (lvl === 1) {
+    if (n === 1) {
       if (!isNum(i.monthly_expenses) || i.monthly_expenses <= 0 ||
           !isNum(i.current_savings) ||
           !isNum(i.monthly_take_home_income) || i.monthly_take_home_income <= 0) {
-        return { level: 1, ready: false, complete: false, actions: [],
+        return { ready: false, actions: [],
                  reason: "Enter your income, expenses and savings to generate your plan." };
       }
-      var target6 = d.emergencyTargetFull;                       // 6x expenses (existing calc)
+      var targetMin = d.emergencyTargetMin, target6 = d.emergencyTargetFull;
       var shortfall = Math.max(0, target6 - i.current_savings);
-      if (shortfall === 0) return { level: 1, ready: true, complete: true, actions: [] };
       // nearest-$50 of min(shortfall/12, 20% of take-home); floored at
       // $50 so rounding can never suggest a $0 transfer
       var raw = Math.min(shortfall / 12, 0.20 * i.monthly_take_home_income);
       var suggestedMonthly = Math.max(50, Math.round(raw / 50) * 50);
-      var monthsToTarget = Math.ceil(shortfall / suggestedMonthly);
-      plan.meta = { target6: target6, shortfall: shortfall,
-                    suggestedMonthly: suggestedMonthly, monthsToTarget: monthsToTarget };
-      // Auto-transfer binds to the SAVINGS ACCOUNT only — SSBs are bought
-      // in manual monthly issues, so they are the optional final step,
-      // never the auto-transfer destination.
-      // L1-A3 is an AUTO-MILESTONE: no buttons; its status derives from
-      // the live progress (savingsProgressPct >= 100 -> done). Manual
-      // status writes to it are refused in setActionStatus.
-      var a3 = act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6);
+      var monthsToTarget = suggestedMonthly > 0 ? Math.ceil(shortfall / suggestedMonthly) : 0;
+
+      var a3 = act("L1-A3",
+        "Build your fund to " + fmtSGD(target6) + " (6 months of expenses)" +
+        (monthsToTarget > 0 ? " — about " + monthsToTarget + " months at this rate." : "."),
+        "auto", target6);
       a3.auto = true;
-      a3.progressPct = isNum(d.savingsProgressPct) ? d.savingsProgressPct : 0;
-      a3.status = (a3.progressPct >= 100) ? "done" : "not_started";
-      a3.autoHint = "Completes automatically when your fund reaches " + fmtSGD(target6) + ".";
-      var a4 = act("L1-A4", "(Optional, once your buffer grows) Move a portion into Singapore Savings Bonds (SSBs) — government-guaranteed and exitable any month — to earn more while staying liquid.");
-      a4.optional = true;
-      plan.actions = [
-        // Protection awareness leads the plan (team decision 2026-07-06):
-        // the MAS sequence keeps the fund as Level 1, but baseline cover
-        // in SG is automatic — knowing that is the true first action.
-        act("L1-A0", "Know your baseline protection — MediShield Life covers you automatically, and DPS is extended with your first CPF working contribution."),
-        act("L1-A1", "Open a high-yield savings account as your emergency-fund home."),
-        act("L1-A2", "Set up an automatic " + fmtSGD(suggestedMonthly) + " transfer on payday into that savings account.", suggestedMonthly),
-        a3,
-        a4
-      ];
-      return plan;
+      a3.progressPct = isNum(d.savingsProgressPct) ? d.savingsProgressPct : 0; // vs 6x, matches the ring
+      // Completion vs display split (amendment): the item completes at
+      // 3 MONTHS (emergencyTargetMin); the ring keeps measuring the 6x
+      // journey. Latched via the persisted status map (no-demote).
+      a3.status = (statuses["L1-A3"] === "done" ||
+                   (isNum(targetMin) && i.current_savings >= targetMin))
+                  ? "done" : "not_started";
+      a3.autoHint = "Build at least 3 months of expenses (" + fmtSGD(targetMin) +
+        ") to complete this step — 6 months (" + fmtSGD(target6) +
+        ") is the ideal. Completes automatically at 3 months.";
+
+      return { ready: true,
+        meta: { target6: target6, targetMin: targetMin, shortfall: shortfall,
+                suggestedMonthly: suggestedMonthly, monthsToTarget: monthsToTarget },
+        actions: [
+          act("L1-A1", "Open a high-yield savings account as your emergency-fund home."),
+          act("L1-A2", "Set up an automatic " + fmtSGD(suggestedMonthly) + " transfer on payday into that savings account.", "attest", suggestedMonthly),
+          a3,
+          act("L1-A5", "Learn the Save First, Spend Later rule.", "learn", null, "the Save First, Spend Later rule"),
+          act("L1-A6", "Learn to tell needs from wants.", "learn", null, "needs versus wants")
+        ] };
     }
 
-    if (lvl === 2) {
-      if (!isNum(d.dtpdTarget)) {
-        return { level: 2, ready: false, complete: false, actions: [],
-                 reason: "Enter your income so your cover targets can be sized." };
-      }
-      plan.actions = [act("L2-B1", "Confirm your MediShield Life and check if you need an Integrated Shield Plan.")];
-      if (!isNum(i.dtpd_coverage_amount) || i.dtpd_coverage_amount < d.dtpdTarget) {
-        plan.actions.push(act("L2-B2", "Get term insurance for Death & TPD to reach " + fmtSGD(d.dtpdTarget) + " cover.", d.dtpdTarget));
-      }
-      if (!isNum(i.critical_illness_coverage_amount) || i.critical_illness_coverage_amount < d.ciTarget) {
-        plan.actions.push(act("L2-B3", "Add Critical Illness term cover to reach " + fmtSGD(d.ciTarget) + ".", d.ciTarget));
-      }
-      if (d.coverageCapConflict === true) {
-        plan.actions.push(act("L2-B4", "Full cover may exceed 15% of take-home — prioritise Death/TPD + DPS first, use term not bundled, and consider Direct Purchase Insurance."));
-      }
-      return plan;
+    if (n === 2) {
+      return { ready: true, actions: [
+        act("L2-B1L", "Learn what baseline protection means.", "learn", null, "baseline insurance protection in Singapore"),
+        act("L2-B2", "Get insurance cover for Death & TPD (aim 9× annual income).", "attest",
+            isNum(d.dtpdTarget) ? d.dtpdTarget : null),
+        act("L2-B3", "Get insurance cover for Critical Illness (aim 4× annual income).", "attest",
+            isNum(d.ciTarget) ? d.ciTarget : null),
+        act("L2-B4L", "Learn what MediShield Life covers.", "learn", null, "MediShield Life"),
+        act("L2-B5", "Verify your MediShield Life coverage status.")
+      ] };
     }
 
-    if (lvl === 3) {
-      if (!isNum(d.investMinMonthly)) {
-        return { level: 3, ready: false, complete: false, actions: [],
-                 reason: "Enter your income to set your 10% investing floor." };
-      }
-      plan.actions = [
-        act("L3-C1", "Set up a monthly investment of at least " + fmtSGD(d.investMinMonthly) + " into a diversified low-cost ETF or a CPF top-up.", d.investMinMonthly),
-        act("L3-C2", "Automate it on payday so it happens without willpower.")
-      ];
-      return plan;
+    if (n === 3) {
+      return { ready: true, actions: [
+        act("L3-C0", "Learn the main types of investment.", "learn", null, "the main types of investment"),
+        act("L3-C2L", "Learn the Rule of 72.", "learn", null, "the Rule of 72"),
+        act("L3-C1", "Set up an investment fund and allocate monthly into low-risk, long-term investments (aim ≥10% of take-home pay).", "attest",
+            isNum(d.investMinMonthly) ? d.investMinMonthly : null)
+      ] };
     }
 
-    // Level 4 — concepts + official tools only, no regulated figures.
-    plan.level = 4;
-    plan.actions = [
+    // Level 4 — kept exactly as built: official tools only, no regulated
+    // figures; unlock precondition routes through levelComplete(3).
+    return { ready: true, actions: [
       act("L4-D1", "Use the CPF Home Purchase Planner to see what you can afford."),
       act("L4-D2", "Use HDB's budget calculator before committing to a flat."),
       act("L4-D3", "Make a CPF top-up for tax relief and retirement compounding.")
-    ];
-    return plan;
+    ] };
   }
 
-  // The user's CURRENT focus action: the first incomplete NON-OPTIONAL
-  // action (started or not); optional actions only once every
-  // non-optional action is done. Used by getCurrentAction() and the
-  // panel's "This week" hero, so both always agree.
-  function nextAction(p) {
-    if (!p || !p.ready || p.complete) return null;
-    var k, a;
-    for (k = 0; k < p.actions.length; k++) {
-      a = p.actions[k];
-      if (!a.optional && a.status !== "done") return a;
+  // All-items gating: level n is complete <=> ready AND every action done.
+  function levelComplete(n, st) {
+    var lv = buildLevel(n, st);
+    return lv.ready && lv.actions.length > 0 &&
+           lv.actions.every(function (a) { return a.status === "done"; });
+  }
+
+  // currentLevel = the first incomplete level; 4 is the final home.
+  function deriveCurrentLevel(st) {
+    if (!levelComplete(1, st)) return 1;
+    if (!levelComplete(2, st)) return 2;
+    if (!levelComplete(3, st)) return 3;
+    return 4;
+  }
+
+  // Back-compatible single-level view used by getPlan()/renderPlan().
+  function generatePlan(st) {
+    var lvl = st.currentLevel || deriveCurrentLevel(st);
+    var lv = buildLevel(lvl, st);
+    return {
+      level: lvl, ready: lv.ready, reason: lv.reason, meta: lv.meta,
+      complete: lv.ready && lv.actions.length > 0 &&
+                lv.actions.every(function (a) { return a.status === "done"; }),
+      actions: lv.actions
+    };
+  }
+
+  // ONE selector for the "THIS WEEK" hero and the Telegram contract:
+  // the first incomplete action in the first incomplete level, walking
+  // across levels.
+  function nextAction(st) {
+    for (var n = 1; n <= 4; n++) {
+      var lv = buildLevel(n, st);
+      if (!lv.ready) return null; // plan can't be generated yet
+      for (var k = 0; k < lv.actions.length; k++) {
+        if (lv.actions[k].status !== "done") return lv.actions[k];
+      }
     }
-    for (k = 0; k < p.actions.length; k++) {
-      a = p.actions[k];
-      if (a.optional && a.status !== "done") return a;
-    }
-    return null;
+    return null; // everything done
   }
 
   /* =================================================================
@@ -275,17 +265,6 @@
       total++;
       console.assert(cond, "[app.js self-test FAILED] " + label);
       if (!cond) pass = false;
-    }
-    // helper: gatekeep from a fresh level-1 profile
-    function gk(overrides) {
-      var inputs = {
-        monthly_take_home_income: 2800, monthly_expenses: 1400,
-        current_savings: null, monthly_insurance_premium: null,
-        dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
-        monthly_investment_amount: null
-      };
-      Object.keys(overrides || {}).forEach(function (k) { inputs[k] = overrides[k]; });
-      return gatekeep(1, inputs);
     }
     // C1: income 2800 / expenses 1400
     check("emergencyTargetFull(1400) === 8400", emergencyTargetFull(1400) === 8400);
@@ -309,34 +288,6 @@
     // clamp + C6 large input
     check("savingsProgressPct(99999, 8400) === 100", savingsProgressPct(99999, 8400) === 100);
     check("fmtSGD(12 * 999999 * 9) formats cleanly", fmtSGD(dtpdTarget(annualIncome(999999))) === "$107,999,892");
-    // Gatekeeping (spec §2): 3x boundary, L2 gates, sequence, forward-only
-    check("G1 savings 4199 (<3x) -> level 1", gk({ current_savings: 4199 }) === 1);
-    check("G2 savings 4200 (=3x) -> level 2", gk({ current_savings: 4200 }) === 2);
-    check("G3 full cover + premium at cap -> level 3", gk({
-      current_savings: 4200, dtpd_coverage_amount: 302400,
-      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 420
-    }) === 3);
-    check("G4 premium above cap blocks L2", gk({
-      current_savings: 4200, dtpd_coverage_amount: 302400,
-      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 421
-    }) === 2);
-    check("G5 investOk after L1+L2 -> level 4", gk({
-      current_savings: 4200, dtpd_coverage_amount: 302400,
-      critical_illness_coverage_amount: 134400, monthly_insurance_premium: 420,
-      monthly_investment_amount: 280
-    }) === 4);
-    check("G6 investOk alone cannot skip the sequence", gk({
-      monthly_investment_amount: 999
-    }) === 1);
-    check("G7 null coverage never completes L2", gk({
-      current_savings: 4200, monthly_insurance_premium: 100
-    }) === 2);
-    check("G8 forward-only: level never demotes", gatekeep(3, {
-      monthly_take_home_income: 2800, monthly_expenses: 1400,
-      current_savings: 100, monthly_insurance_premium: null,
-      dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
-      monthly_investment_amount: null
-    }) === 3);
     // Coverage-cap conflict (CoverageCap_Conflict_Handling.txt Part E)
     // helper: compute the flag for an income-2500 profile (cap = $375)
     function ccFlag(o) {
@@ -358,96 +309,144 @@
     // CC3: a required field null (premium) -> conflict false, no false alarm
     check("CC3 null premium -> conflict false",
       ccFlag({ dtpd_coverage_amount: 100000, monthly_insurance_premium: null }) === false);
-    // P1: action-plan generator — 2800/1400/4956 profile, exact values.
-    // Rounding rule: suggestedMonthly = max($50, nearest-$50 of
-    // min(shortfall/12, 20% take-home)) = max(50, round(287/50)*50) = 300.
+    /* ---- Data-driven level model + items-based gating (2026-07-06) ---- */
     (function () {
-      var inputs = {
+      var BASE = {
         monthly_take_home_income: 2800, monthly_expenses: 1400,
         current_savings: 4956, monthly_insurance_premium: null,
         dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
         monthly_investment_amount: null
       };
-      var p = generatePlan({ inputs: inputs, derived: computeAll(inputs), currentLevel: 1, actions: {} });
-      check("P1 plan ready (5 actions incl. protection lead + optional SSB)", p.ready === true && p.actions.length === 5);
-      check("P0 baseline-protection action leads the Level 1 plan",
-        p.actions[0].id === "L1-A0" && !p.actions[0].optional &&
-        p.actions[0].text.indexOf("MediShield") !== -1);
-      check("P1 target6 8400", p.meta.target6 === 8400);
-      check("P1 shortfall 3444", p.meta.shortfall === 3444);
-      check("P1 suggestedMonthly 300 (nearest-$50 of min(287,560))", p.meta.suggestedMonthly === 300);
-      check("P1 monthsToTarget 12", p.meta.monthsToTarget === 12);
-      check("P1 A2 renders $300", p.actions[2].text.indexOf("$300") !== -1);
-      check("P1 A3 renders $8,400 and 12 months",
-        p.actions[3].text.indexOf("$8,400") !== -1 && p.actions[3].text.indexOf("12 months") !== -1);
-      check("P1 A4 is the optional SSB step",
-        p.actions[4].id === "L1-A4" &&
-        p.actions[4].text.indexOf("Optional") !== -1 &&
-        p.actions[4].text.indexOf("Singapore Savings Bonds") !== -1 &&
-        p.actions[4].amount === null);
-      check("P1 auto-transfer binds to the savings account only",
-        p.actions[2].text.indexOf("savings account") !== -1 &&
-        p.actions[2].text.indexOf("SSB") === -1 &&
-        p.actions[4].text.indexOf("automatic") === -1);
-      // M-series: A3 auto-milestone + focus selection
-      (function () {
-        function st(savings, actions) {
-          var inputs = {
-            monthly_take_home_income: 2800, monthly_expenses: 1400,
-            current_savings: savings, monthly_insurance_premium: null,
-            dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
-            monthly_investment_amount: null
-          };
-          return generatePlan({ inputs: inputs, derived: computeAll(inputs),
-                                currentLevel: 1, actions: actions || {} });
+      function mk(over, actions) {
+        var inputs = {};
+        Object.keys(BASE).forEach(function (k) { inputs[k] = BASE[k]; });
+        Object.keys(over || {}).forEach(function (k) { inputs[k] = over[k]; });
+        return { inputs: inputs, derived: computeAll(inputs), actions: actions || {} };
+      }
+      function merge() {
+        var out = {};
+        for (var a = 0; a < arguments.length; a++) {
+          var m = arguments[a], ks = Object.keys(m);
+          for (var j = 0; j < ks.length; j++) out[ks[j]] = m[ks[j]];
         }
-        var p36 = st(3024, { "L1-A0": "done", "L1-A1": "done", "L1-A2": "done" }); // 3024/8400 = 36%
-        check("M1 A3 is an auto milestone, not done below 100%",
-          p36.actions[3].auto === true && p36.actions[3].status !== "done" &&
-          p36.actions[3].progressPct === 36);
-        var p100 = st(8399, {});                                  // rounds to 100%, shortfall $1
-        check("M2 A3 auto-done at 100% live progress",
-          p100.ready === true && p100.actions[3].status === "done");
-        var na36 = nextAction(p36);
-        check("M3 current action is A3 (never A4) while A3 incomplete",
-          na36 !== null && na36.id === "L1-A3" && na36.id !== "L1-A4");
-        var naAfter = nextAction(st(8399, { "L1-A0": "done", "L1-A1": "done", "L1-A2": "done" }));
-        check("M4 optional A4 becomes current only after all non-optional done",
-          naAfter !== null && naAfter.id === "L1-A4");
-      })();
-      // Fund-note (post-L1 progress visibility): exact string, null-safe
-      (function () {
-        var in5000 = { monthly_take_home_income: 2800, monthly_expenses: 1400,
-          current_savings: 5000, monthly_insurance_premium: null,
-          dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
-          monthly_investment_amount: null };
-        var d5000 = computeAll(in5000);
-        check("F1 fund note at level 2 reads 60% of $8,400",
-          fundProgressNote(d5000, 2) === "Unlocked at 3× — fund 60% of $8,400");
-        check("F2 fund note null while still on level 1",
-          fundProgressNote(d5000, 1) === null);
-        var dNull = computeAll({ monthly_take_home_income: null, monthly_expenses: null,
+        return out;
+      }
+      var L1_MANUAL = { "L1-A1": "done", "L1-A2": "done", "L1-A5": "done", "L1-A6": "done" };
+      var L2_ALL = { "L2-B1L": "done", "L2-B2": "done", "L2-B3": "done", "L2-B4L": "done", "L2-B5": "done" };
+      var L3_ALL = { "L3-C0": "done", "L3-C2L": "done", "L3-C1": "done" };
+
+      // Structure
+      var l1 = buildLevel(1, mk());
+      check("S1 L1: 5 items, attest/attest/auto/learn/learn, ids A1,A2,A3,A5,A6",
+        l1.actions.length === 5 &&
+        l1.actions.map(function (a) { return a.type; }).join() === "attest,attest,auto,learn,learn" &&
+        l1.actions.map(function (a) { return a.id; }).join() === "L1-A1,L1-A2,L1-A3,L1-A5,L1-A6");
+      var l2 = buildLevel(2, mk());
+      check("S2 L2: 5 fixed items, learn/attest/attest/learn/attest, 2.5 = verify MediShield",
+        l2.actions.length === 5 &&
+        l2.actions.map(function (a) { return a.type; }).join() === "learn,attest,attest,learn,attest" &&
+        l2.actions[4].text.indexOf("Verify your MediShield Life") !== -1);
+      var l3 = buildLevel(3, mk());
+      check("S3 L3: 3 items, learn/learn/attest",
+        l3.actions.length === 3 &&
+        l3.actions.map(function (a) { return a.type; }).join() === "learn,learn,attest");
+      var l4 = buildLevel(4, mk());
+      check("S4 L4 kept as built: 3 attest items D1-D3",
+        l4.actions.length === 3 &&
+        l4.actions.every(function (a) { return a.type === "attest"; }) &&
+        l4.actions[0].id === "L4-D1");
+      var allIds = [];
+      [1, 2, 3, 4].forEach(function (n) {
+        buildLevel(n, mk()).actions.forEach(function (a) { allIds.push(a.id); });
+      });
+      check("S5 no L1-A4 (SSB) and no L1-A0 remain",
+        allIds.indexOf("L1-A4") === -1 && allIds.indexOf("L1-A0") === -1);
+      check("S6 dynamic values: A2 $300; A3 hint exact per amendment",
+        l1.actions[1].text.indexOf("$300") !== -1 &&
+        l1.actions[2].autoHint === "Build at least 3 months of expenses ($4,200) to complete this step — 6 months ($8,400) is the ideal. Completes automatically at 3 months.");
+      check("S7 L1 not ready on null inputs",
+        buildLevel(1, { inputs: { monthly_take_home_income: null, monthly_expenses: null,
           current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
-          critical_illness_coverage_amount: null, monthly_investment_amount: null });
-        check("F3 fund note null-safe on missing inputs",
-          fundProgressNote(dNull, 2) === null);
-        // Ring honesty: no cover data -> pct null (ring "—"), never a false 0%
-        var noCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
-          current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: null,
-          critical_illness_coverage_amount: null, monthly_investment_amount: null };
-        check("F4 L2 focus pct is null with no cover data",
-          focusFor(2, noCover, computeAll(noCover)).pct === null);
-        var withCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
-          current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: 100000,
-          critical_illness_coverage_amount: 50000, monthly_investment_amount: null };
-        check("F5 L2 focus pct numeric once both covers entered",
-          focusFor(2, withCover, computeAll(withCover)).pct === 33);
-      })();
-      var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
+          critical_illness_coverage_amount: null, monthly_investment_amount: null },
+          derived: null, actions: {} }).ready === false);
+
+      // Amendment: 1.3 completes at 3x (emergencyTargetMin), latched
+      check("A1 1.3 not done below 3x (savings 4199)",
+        buildLevel(1, mk({ current_savings: 4199 })).actions[2].status !== "done");
+      check("A2 1.3 auto-done at 3x (savings 4200)",
+        buildLevel(1, mk({ current_savings: 4200 })).actions[2].status === "done");
+      check("A3 latch survives a later drop below 3x",
+        buildLevel(1, mk({ current_savings: 100 }, { "L1-A3": "done" })).actions[2].status === "done");
+      check("A4 L1 needs ALL 5: manual 4 done + savings 4199 -> incomplete",
+        levelComplete(1, mk({ current_savings: 4199 }, L1_MANUAL)) === false);
+      check("A5 L1 complete: manual 4 done + savings >= 3x",
+        levelComplete(1, mk({}, L1_MANUAL)) === true);
+
+      // Items-based gating + cross-level selector
+      check("N1 4/5 L1 done -> still level 1",
+        deriveCurrentLevel(mk({}, { "L1-A1": "done", "L1-A2": "done", "L1-A5": "done" })) === 1);
+      check("N2 all L1 done -> level 2; nextAction walks to L2-B1L",
+        deriveCurrentLevel(mk({}, L1_MANUAL)) === 2 &&
+        nextAction(mk({}, L1_MANUAL)).id === "L2-B1L");
+      check("N3 L2 4/5 done -> still level 2",
+        deriveCurrentLevel(mk({}, merge(L1_MANUAL,
+          { "L2-B1L": "done", "L2-B2": "done", "L2-B3": "done", "L2-B4L": "done" }))) === 2);
+      check("N4 all L1+L2 done -> level 3; next is L3-C0",
+        deriveCurrentLevel(mk({}, merge(L1_MANUAL, L2_ALL))) === 3 &&
+        nextAction(mk({}, merge(L1_MANUAL, L2_ALL))).id === "L3-C0");
+      check("N5 L4 unlocks only via levelComplete(3); next is L4-D1",
+        deriveCurrentLevel(mk({}, merge(L1_MANUAL, L2_ALL, L3_ALL))) === 4 &&
+        nextAction(mk({}, merge(L1_MANUAL, L2_ALL, L3_ALL))).id === "L4-D1");
+      var DONE_ALL = merge(L1_MANUAL, L2_ALL, L3_ALL,
+        { "L4-D1": "done", "L4-D2": "done", "L4-D3": "done" });
+      check("N6 everything done -> nextAction null, level stays 4",
+        nextAction(mk({}, DONE_ALL)) === null && deriveCurrentLevel(mk({}, DONE_ALL)) === 4);
+
+      // Every attest/learn item completes via the persisted status map
+      var completable = [];
+      [1, 2, 3, 4].forEach(function (n) {
+        buildLevel(n, mk()).actions.forEach(function (a) {
+          if (a.type !== "auto") completable.push(a.id);
+        });
+      });
+      var okAll = completable.every(function (id) {
+        var m = {}; m[id] = "done";
+        var st2 = mk({}, m);
+        var found = null;
+        [1, 2, 3, 4].some(function (n) {
+          return buildLevel(n, st2).actions.some(function (a) {
+            if (a.id === id) { found = a.status; return true; }
+            return false;
+          });
+        });
+        return found === "done";
+      });
+      check("N7 all " + completable.length + " attest/learn items persist done via the status map", okAll === true);
+    })();
+    // Fund-note + focus-ring honesty (rewording per amendment)
+    (function () {
+      var in5000 = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+        current_savings: 5000, monthly_insurance_premium: null,
+        dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+        monthly_investment_amount: null };
+      var d5000 = computeAll(in5000);
+      check("F1 fund note exact wording per amendment",
+        fundProgressNote(d5000, 2) === "Emergency fund · 60% of $8,400 (aim: 3 months min, 6 months ideal)");
+      check("F2 fund note null while still on level 1",
+        fundProgressNote(d5000, 1) === null);
+      var dNull = computeAll({ monthly_take_home_income: null, monthly_expenses: null,
         current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
-        critical_illness_coverage_amount: null, monthly_investment_amount: null },
-        derived: null, currentLevel: 1, actions: {} });
-      check("P1 null inputs -> ready:false, no actions", pNull.ready === false && pNull.actions.length === 0);
+        critical_illness_coverage_amount: null, monthly_investment_amount: null });
+      check("F3 fund note null-safe on missing inputs",
+        fundProgressNote(dNull, 2) === null);
+      var noCover = in5000;
+      check("F4 L2 focus pct is null with no cover data",
+        focusFor(2, noCover, computeAll(noCover)).pct === null);
+      var withCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+        current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: 100000,
+        critical_illness_coverage_amount: 50000, monthly_investment_amount: null };
+      check("F5 L2 focus pct numeric once both covers entered",
+        focusFor(2, withCover, computeAll(withCover)).pct === 33);
     })();
     console.log(pass
       ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
@@ -476,7 +475,7 @@
   var state = {
     inputs: {},          // the 7 raw fields, null until provided
     derived: {},         // computeAll() output
-    currentLevel: 1,     // gatekeeping arrives in Phase 3
+    currentLevel: 1,     // derived from items-based gating (deriveCurrentLevel)
     actions: {},         // action-plan statuses: id -> not_started|started|done
     lastUpdated: null
   };
@@ -728,7 +727,8 @@
   function fundProgressNote(d, currentLevel) {
     if (currentLevel <= 1) return null;
     if (!isNum(d.savingsProgressPct) || !isNum(d.emergencyTargetFull)) return null;
-    return "Unlocked at 3× — fund " + d.savingsProgressPct + "% of " + fmtSGD(d.emergencyTargetFull);
+    return "Emergency fund · " + d.savingsProgressPct + "% of " + fmtSGD(d.emergencyTargetFull) +
+           " (aim: 3 months min, 6 months ideal)";
   }
 
   function pushDashboard(celebrateLevel) {
@@ -760,9 +760,20 @@
   function recompute() {
     state.derived = computeAll(state.inputs);
 
-    // Gatekeeping (spec §2): forward-only; celebrate real level-ups only.
+    // Latch the 1.3 auto-milestone at 3 MONTHS (emergencyTargetMin) into
+    // the persisted status map — no-demote: a later savings dip can never
+    // re-lock the item or Level 2 (amendment 2026-07-06).
+    if (isNum(state.derived.emergencyTargetMin) &&
+        isNum(state.inputs.current_savings) &&
+        state.inputs.current_savings >= state.derived.emergencyTargetMin &&
+        state.actions["L1-A3"] !== "done") {
+      state.actions["L1-A3"] = "done";
+    }
+
+    // Items-based gating: level = first incomplete level (forward-only;
+    // statuses are monotone so this can only move up).
     var prev = state.currentLevel;
-    var next = gatekeep(prev, state.inputs);
+    var next = Math.max(prev, deriveCurrentLevel(state));
     var leveledUp = next > prev;
     state.currentLevel = next;
 
@@ -923,8 +934,8 @@
     progress.hidden = false;
     progress.textContent = doneCount + " of " + plan.actions.length + " actions done";
 
-    // Next Best Action = same selection getCurrentAction() uses
-    var nba = nextAction(plan);
+    // Next Best Action = same cross-level selection getCurrentAction() uses
+    var nba = nextAction(state);
     if (nba) {
       hero.hidden = false;
       q("hero-text").textContent = nba.text;
@@ -951,12 +962,18 @@
       }
       var btns = document.createElement("span");
       btns.className = "plan-btns";
-      if (a.auto) {
-        // auto milestone: NO buttons — status derives from live progress
+      if (a.type === "auto") {
+        // auto milestone: NO buttons — status derives from the numbers
         btns.innerHTML = (a.status === "done")
           ? '<span class="plan-lvl-tag">Done</span>'
           : '<span class="plan-lvl-tag is-auto-tag">' +
             (isNum(a.progressPct) ? a.progressPct + "% there" : "Auto") + '</span>';
+      } else if (a.type === "learn") {
+        // learn item: open the embedded coach + mark as learned
+        btns.innerHTML = (a.status === "done")
+          ? '<span class="plan-lvl-tag">Done</span>'
+          : '<button class="btn btn-ghost btn-xs" type="button" data-plan-coach>Open coach</button>' +
+            '<button class="btn btn-accent btn-xs" type="button" data-plan-set="done" data-id="' + a.id + '">Mark as learned</button>';
       } else if (a.status === "not_started") {
         btns.innerHTML = '<button class="btn btn-ghost btn-xs" type="button" data-plan-set="started" data-id="' + a.id + '">Mark started</button>' +
                          '<button class="btn btn-accent btn-xs" type="button" data-plan-set="done" data-id="' + a.id + '">Mark done</button>';
@@ -971,37 +988,37 @@
     });
   }
 
-  function completeLevelViaPlan() {
-    var completed = state.currentLevel;
-    if (state.currentLevel < 4) state.currentLevel += 1; // forward-only
-    state.lastUpdated = new Date().toISOString();
-    saveState();
-    pushDashboard(completed);        // re-renders cards + existing toast
-    pushBotpressVars("plan");
-    if (state.currentLevel > completed) pushLevelSync(state.currentLevel);
-    renderPlan();
-    console.log("[app.js] plan complete — level " + completed + " done" +
-      (state.currentLevel > completed ? ", advanced to " + state.currentLevel : ""));
-  }
-
   function setActionStatus(id, status) {
     if (ACTION_STATUSES.indexOf(status) === -1) return;
-    // Handler-level gate re-check: auto milestones derive their status
-    // from live progress — a stale-DOM tap can never set them manually.
-    var current = generatePlan(state);
-    for (var k = 0; k < current.actions.length; k++) {
-      if (current.actions[k].id === id && current.actions[k].auto) {
-        renderPlan(); // refresh any stale buttons
-        return;
+    // Handler-level guard: auto items (L1-A3) derive their status from
+    // the numbers — a manual/forged write can never set OR overwrite
+    // them, regardless of which level is current. learn/attest allowed.
+    for (var n = 1; n <= 4; n++) {
+      var lvv = buildLevel(n, state);
+      for (var k = 0; k < lvv.actions.length; k++) {
+        if (lvv.actions[k].id === id && lvv.actions[k].type === "auto") {
+          renderPlan(); // refresh any stale buttons
+          return;
+        }
       }
     }
     state.actions[id] = status;
     state.lastUpdated = new Date().toISOString();
     saveState();
-    var plan = generatePlan(state);
-    var allDone = plan.ready && plan.actions.length > 0 &&
-      plan.actions.every(function (a) { return a.status === "done"; });
-    if (allDone) { completeLevelViaPlan(); return; }
+
+    // Items-based gating: advancing = the derived first-incomplete level.
+    var prev = state.currentLevel;
+    var next = Math.max(prev, deriveCurrentLevel(state));
+    if (next > prev) {
+      state.currentLevel = next;
+      saveState();
+      pushDashboard(prev);           // existing celebration toast for the completed level
+      pushBotpressVars("plan");
+      pushLevelSync(next);           // Contract 4 (no-op while flag OFF)
+      console.log("[app.js] level " + prev + " complete — advanced to " + next);
+    } else {
+      pushBotpressVars("plan");      // keep the coach's variables fresh
+    }
     renderPlan();
   }
 
@@ -1009,6 +1026,17 @@
     var panel = document.getElementById("planPanel");
     if (!panel) return;
     panel.addEventListener("click", function (e) {
+      var coachBtn = e.target.closest("[data-plan-coach]");
+      if (coachBtn) {
+        // learn items: open the embedded Botpress webchat (no event
+        // bridge — scoping decision; the user marks it learned manually)
+        if (window.botpress && typeof window.botpress.open === "function") {
+          try { window.botpress.open(); } catch (err) { /* non-fatal */ }
+        }
+        var coachEl = document.getElementById("coach");
+        if (coachEl) coachEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
       var btn = e.target.closest("[data-plan-set]");
       if (btn) setActionStatus(btn.dataset.id, btn.dataset.planSet);
     });
@@ -1114,15 +1142,16 @@
      next action ("Did you set up the $300 transfer?"). Read-only;
      no n8n changes live in this repo.
      ================================================================= */
-  // The current FOCUS action for the current level: first incomplete
-  // non-optional action (auto milestones like L1-A3 count until their
-  // derived status is done); optional actions (L1-A4) are excluded
-  // until every non-optional action is complete. Null when the level's
-  // checklist is done or no plan can be generated yet.
+  // The current FOCUS action: the first incomplete action in the first
+  // incomplete level, walking across levels — the same selector that
+  // drives the panel's "THIS WEEK" hero. Null when nothing can be
+  // generated yet, or everything is done.
   window.MFC.getCurrentAction = function () {
-    var a = nextAction(generatePlan(state));
+    var a = nextAction(state);
     return a ? { id: a.id, text: a.text, amount: a.amount } : null;
   };
+  // Items-based level gating, exposed read-only for QA.
+  window.MFC.levelComplete = function (n) { return levelComplete(n, state); };
   // The full current-level action array (id/text/level/status/amount).
   window.MFC.getPlan = function () {
     return generatePlan(state).actions;
