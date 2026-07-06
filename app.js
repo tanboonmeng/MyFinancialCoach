@@ -157,8 +157,10 @@
     var i = st.inputs, d = st.derived || computeAll(st.inputs);
     var lvl = st.currentLevel || 1;
     var statuses = st.actions || {};
-    function act(id, text) {
-      return { id: id, text: text, level: lvl, status: statuses[id] || "not_started" };
+    function act(id, text, amount) {
+      return { id: id, text: text, level: lvl,
+               status: statuses[id] || "not_started",
+               amount: isNum(amount) ? amount : null };
     }
     var plan = { level: lvl, ready: true, complete: false, actions: [] };
 
@@ -181,8 +183,8 @@
                     suggestedMonthly: suggestedMonthly, monthsToTarget: monthsToTarget };
       plan.actions = [
         act("L1-A1", "Open a high-yield savings account or Singapore Savings Bond (SSB) for your emergency fund."),
-        act("L1-A2", "Set up an automatic transfer of " + fmtSGD(suggestedMonthly) + " on payday."),
-        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.")
+        act("L1-A2", "Set up an automatic transfer of " + fmtSGD(suggestedMonthly) + " on payday.", suggestedMonthly),
+        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6)
       ];
       return plan;
     }
@@ -194,10 +196,10 @@
       }
       plan.actions = [act("L2-B1", "Confirm your MediShield Life and check if you need an Integrated Shield Plan.")];
       if (!isNum(i.dtpd_coverage_amount) || i.dtpd_coverage_amount < d.dtpdTarget) {
-        plan.actions.push(act("L2-B2", "Get term insurance for Death & TPD to reach " + fmtSGD(d.dtpdTarget) + " cover."));
+        plan.actions.push(act("L2-B2", "Get term insurance for Death & TPD to reach " + fmtSGD(d.dtpdTarget) + " cover.", d.dtpdTarget));
       }
       if (!isNum(i.critical_illness_coverage_amount) || i.critical_illness_coverage_amount < d.ciTarget) {
-        plan.actions.push(act("L2-B3", "Add Critical Illness term cover to reach " + fmtSGD(d.ciTarget) + "."));
+        plan.actions.push(act("L2-B3", "Add Critical Illness term cover to reach " + fmtSGD(d.ciTarget) + ".", d.ciTarget));
       }
       if (d.coverageCapConflict === true) {
         plan.actions.push(act("L2-B4", "Full cover may exceed 15% of take-home — prioritise Death/TPD + DPS first, use term not bundled, and consider Direct Purchase Insurance."));
@@ -211,7 +213,7 @@
                  reason: "Enter your income to set your 10% investing floor." };
       }
       plan.actions = [
-        act("L3-C1", "Set up a monthly investment of at least " + fmtSGD(d.investMinMonthly) + " into a diversified low-cost ETF or a CPF top-up."),
+        act("L3-C1", "Set up a monthly investment of at least " + fmtSGD(d.investMinMonthly) + " into a diversified low-cost ETF or a CPF top-up.", d.investMinMonthly),
         act("L3-C2", "Automate it on payday so it happens without willpower.")
       ];
       return plan;
@@ -967,6 +969,29 @@
   window.MFC.generatePlanFor = function (st) {
     return generatePlan({ inputs: st.inputs, derived: computeAll(st.inputs),
                           currentLevel: st.currentLevel || 1, actions: st.actions || {} });
+  };
+
+  /* =================================================================
+     CHECK CONTRACT (Phase 3) — read by Rainie's n8n / the Python
+     scheduler so the weekly Telegram nudge can name the user's actual
+     next action ("Did you set up the $300 transfer?"). Read-only;
+     no n8n changes live in this repo.
+     ================================================================= */
+  // The current NOT_STARTED action for the current level, or null if
+  // the level's checklist is done (or no plan can be generated yet).
+  window.MFC.getCurrentAction = function () {
+    var p = generatePlan(state);
+    if (!p.ready || p.complete) return null;
+    for (var k = 0; k < p.actions.length; k++) {
+      if (p.actions[k].status === "not_started") {
+        return { id: p.actions[k].id, text: p.actions[k].text, amount: p.actions[k].amount };
+      }
+    }
+    return null;
+  };
+  // The full current-level action array (id/text/level/status/amount).
+  window.MFC.getPlan = function () {
+    return generatePlan(state).actions;
   };
 
   /* =================================================================

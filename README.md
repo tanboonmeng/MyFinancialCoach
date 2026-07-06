@@ -91,7 +91,11 @@ editing, use VS Code's **Live Server** extension.
   L2 needs 9x/4x cover + the 15% premium cap), coverage-cap conflict flag,
   and the 6 user variables pushed to Botpress on init + every recalc via
   `window.botpress.updateUser` (Contract 3).
-- **Rainie** — Workflow C level sync (Contract 4) is coded but OFF by
+- **Rainie** — the weekly nudge can now be action-specific: on app.html,
+  `window.MFC.getCurrentAction()` returns `{ id, text, amount|null }` for the
+  user's next not-started plan action (null when the level's checklist is
+  done), and `window.MFC.getPlan()` returns the full current-level action
+  array. Also: Workflow C level sync (Contract 4) is coded but OFF by
   default. When the n8n webhook exists, uncomment the `MFC_CONFIG` line in
   `app.html` and paste the URL; until then, update `current_level` in the
   CoachStore sheet manually for the demo (documented scoping decision).
