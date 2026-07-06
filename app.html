@@ -214,14 +214,6 @@
           </div>
         </section>
 
-        <!-- ========================================================= -->
-        <!-- LIVE COACH CHAT — the Botpress webchat renders INLINE here -->
-        <!-- and opens automatically (see embed script at end of file). -->
-        <!-- ========================================================= -->
-        <aside class="workspace-chat" id="coach" aria-label="Coach chat">
-          <div id="mfc-webchat" class="workspace-embed"></div>
-        </aside>
-
       </div>
 
       <!-- =========================================================
@@ -258,6 +250,17 @@
     </div>
   </main>
 
+  <!-- Floating "Ask Coach AI" button — toggles the Botpress webchat,
+       which now floats bottom-right in its default window (the button
+       hides itself while the chat is open; the chat's X closes it). -->
+  <button type="button" class="coach-fab" id="askCoachBtn" aria-haspopup="dialog" aria-expanded="false">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 3l1.9 4.6L18.5 9.5l-4.6 1.9L12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3z"/>
+      <path d="M19 14l.8 1.9 1.9.8-1.9.8L19 19.4l-.8-1.9-1.9-.8 1.9-.8L19 14z"/>
+    </svg>
+    Ask Coach AI
+  </button>
+
   <!-- Reset confirmation dialog (wired in app.js) -->
   <div class="mfc-modal" id="resetModal" hidden>
     <div class="mfc-modal-backdrop" id="resetBackdrop"></div>
@@ -272,17 +275,14 @@
   </div>
 
   <!-- ============================================================
-       LIVE BOTPRESS WEBCHAT — embedded INLINE in #mfc-webchat.
-       Uses webchat v3.3, the version Botpress's "Embed in a custom
-       container" docs support (v3.6 renders in shadow DOM at body level
-       and ignores the selector option — verified 2026-07-05, which is
-       why the runtime is pinned to v3.3 here).
-       The init object below is Sammi's generated config, copied verbatim
-       from https://files.bpcontent.cloud/2026/07/04/04/20260704045157-J01PYF0L.js
-       with ONE addition: selector: "#mfc-webchat".
-       SAMMI: if you regenerate the snippet in Botpress Studio, replace
-       the init object below with the new file's contents and keep the
-       selector line.
+       LIVE BOTPRESS WEBCHAT — floating window, opened by the custom
+       "Ask Coach AI" button (Botpress's own bubble stays hidden via
+       CSS; our branded button is the single entry point).
+       Runtime stays pinned to webchat v3.3 (the version this config
+       was built against; v3.6 changes the DOM contract).
+       The init object below is Sammi's generated config, copied
+       verbatim. SAMMI: if you regenerate the snippet in Botpress
+       Studio, replace the init object below with the new contents.
        ============================================================ -->
   <script src="https://cdn.botpress.cloud/webchat/v3.3/inject.js"></script>
   <script>
@@ -292,7 +292,6 @@
       window.botpress.init({
         "botId": "ae7f97d0-1d27-40d4-827b-30077dd61c64",
         "clientId": "69779f1d-ebc2-4f5a-b985-406d58000554",
-        "selector": "#mfc-webchat",
         "configuration": {
           "version": "v2",
           "composerPlaceholder": "Ask me about saving, insurance, or your next step...",
@@ -326,56 +325,33 @@
         }
       });
 
-      // v3.3 ignores the selector option and mounts the widget at body
-      // level. IMPORTANT: do NOT re-parent the widget into the mount —
-      // its UI lives in an iframe, and moving an iframe resets its
-      // document, leaving a blank panel. Instead we PIN the widget over
-      // the #mfc-webchat spacer with positioning only (the approach the
-      // Botpress embed docs endorse: "update the bpWebchat class to
-      // change the size and position").
-      var mount = document.getElementById("mfc-webchat");
-      var pinned = false;
+      // "Ask Coach AI" floating button: opens the chat; hides itself
+      // while the chat is open (the chat window's X closes it and the
+      // button returns). State follows the webchat events so it stays
+      // correct no matter what opened the chat (e.g. a learn item's
+      // "Open coach" button in the action plan).
+      var fab = document.getElementById("askCoachBtn");
+      var chatOpen = false;
 
-      function pinWidget() {
-        var widget = document.querySelector(".bpWebchat");
-        if (!widget || !mount) return;
-        var r = mount.getBoundingClientRect();
-        var s = widget.style;
-        s.position = "absolute";
-        s.top = Math.round(r.top + window.scrollY) + "px";
-        s.left = Math.round(r.left + window.scrollX) + "px";
-        s.width = Math.round(r.width) + "px";
-        s.height = Math.round(r.height) + "px";
-        s.maxWidth = "none";
-        s.maxHeight = "none";
-        s.right = "auto";
-        s.bottom = "auto";
-        s.zIndex = "10";   /* below the sticky nav (z-index 50) */
-        pinned = true;
-      }
-
-      function goLive() {
-        pinWidget();
-        try { window.botpress.open(); } catch (e) { /* non-fatal */ }
+      function setFab(open) {
+        chatOpen = open;
+        if (!fab) return;
+        fab.classList.toggle("is-open", open);
+        fab.setAttribute("aria-expanded", open ? "true" : "false");
       }
 
       if (typeof window.botpress.on === "function") {
-        window.botpress.on("webchat:ready", goLive);
-        window.botpress.on("webchat:initialized", goLive);
-        // The inline chat is a fixed part of the workspace — if it gets
-        // closed (widget X button), reopen it.
-        window.botpress.on("webchat:closed", function () {
-          if (pinned) setTimeout(function () {
-            try { window.botpress.open(); } catch (e) {}
-          }, 150);
-        });
+        window.botpress.on("webchat:opened", function () { setFab(true); });
+        window.botpress.on("webchat:closed", function () { setFab(false); });
       }
 
-      // Keep the widget glued to the spacer through resizes and layout
-      // shifts (e.g. the level-up demo changing the dashboard's height).
-      window.addEventListener("resize", pinWidget);
-      if ("ResizeObserver" in window) {
-        new ResizeObserver(function () { pinWidget(); }).observe(document.body);
+      if (fab) {
+        fab.addEventListener("click", function () {
+          try {
+            if (chatOpen) window.botpress.close();
+            else window.botpress.open();
+          } catch (e) { /* non-fatal */ }
+        });
       }
     })();
   </script>

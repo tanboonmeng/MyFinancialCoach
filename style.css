@@ -1599,26 +1599,46 @@ section[id] {
   grid-template-columns: 1fr;
   gap: 1.5rem;
 }
-@media (min-width: 1180px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr) 380px;
-    align-items: start;
-  }
-  /* note: the chat column is NOT sticky — the live widget is pinned to the
-     #mfc-webchat spacer in document coordinates (see app.html script). */
-}
 
-/* Inline Botpress embed (app.html). #mfc-webchat is a transparent SPACER
-   that reserves the chat's spot in the layout; the live widget (which has
-   its own branded chrome) is position-pinned over it by app.html's script.
-   Positioning only — the widget's branding is set in Botpress. */
-.workspace-embed {
-  height: min(70vh, 40rem);
-}
-/* The chat lives inline in the workspace, so the floating bubble and its
-   proactive message preview are hidden (only app.html loads the widget). */
+/* The coach chat floats in the Botpress default window, opened by the
+   custom "Ask Coach AI" button below. Botpress's own bubble and its
+   proactive message preview stay hidden — one entry point only. */
 .bpFabWrapper,
 .bpMessagePreview { display: none; }
+
+/* Floating "Ask Coach AI" button (app.html). Hidden while the chat is
+   open — the chat window's X close button brings it back. */
+.coach-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1.3rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  box-shadow: 0 10px 26px rgba(10, 87, 72, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.coach-fab svg { width: 1.15rem; height: 1.15rem; }
+.coach-fab:hover {
+  background: var(--brand-deep);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(10, 87, 72, 0.4);
+}
+.coach-fab:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+.coach-fab.is-open { display: none; }
 
 /* ---------- How it works (architecture strip) ---------- */
 .how-intro {
