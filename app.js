@@ -145,6 +145,89 @@
   }
 
   /* =================================================================
+     ACTION PLAN GENERATOR (Plan -> Do -> Check) — DETERMINISTIC ONLY.
+     Same inputs -> same plan, every time. No LLM, no network. Reads
+     the values computeAll() already derived (never re-derives MAS
+     formulas). Null-safe: missing required inputs -> ready:false and
+     the UI shows "enter your numbers to generate your plan".
+     Action ids are stable (L1-A1...) so statuses persist in
+     mfc_state_v1 across regenerations.
+     ================================================================= */
+  function generatePlan(st) {
+    var i = st.inputs, d = st.derived || computeAll(st.inputs);
+    var lvl = st.currentLevel || 1;
+    var statuses = st.actions || {};
+    function act(id, text) {
+      return { id: id, text: text, level: lvl, status: statuses[id] || "not_started" };
+    }
+    var plan = { level: lvl, ready: true, complete: false, actions: [] };
+
+    if (lvl === 1) {
+      if (!isNum(i.monthly_expenses) || i.monthly_expenses <= 0 ||
+          !isNum(i.current_savings) ||
+          !isNum(i.monthly_take_home_income) || i.monthly_take_home_income <= 0) {
+        return { level: 1, ready: false, complete: false, actions: [],
+                 reason: "Enter your income, expenses and savings to generate your plan." };
+      }
+      var target6 = d.emergencyTargetFull;                       // 6x expenses (existing calc)
+      var shortfall = Math.max(0, target6 - i.current_savings);
+      if (shortfall === 0) return { level: 1, ready: true, complete: true, actions: [] };
+      // nearest-$50 of min(shortfall/12, 20% of take-home); floored at
+      // $50 so rounding can never suggest a $0 transfer
+      var raw = Math.min(shortfall / 12, 0.20 * i.monthly_take_home_income);
+      var suggestedMonthly = Math.max(50, Math.round(raw / 50) * 50);
+      var monthsToTarget = Math.ceil(shortfall / suggestedMonthly);
+      plan.meta = { target6: target6, shortfall: shortfall,
+                    suggestedMonthly: suggestedMonthly, monthsToTarget: monthsToTarget };
+      plan.actions = [
+        act("L1-A1", "Open a high-yield savings account or Singapore Savings Bond (SSB) for your emergency fund."),
+        act("L1-A2", "Set up an automatic transfer of " + fmtSGD(suggestedMonthly) + " on payday."),
+        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.")
+      ];
+      return plan;
+    }
+
+    if (lvl === 2) {
+      if (!isNum(d.dtpdTarget)) {
+        return { level: 2, ready: false, complete: false, actions: [],
+                 reason: "Enter your income so your cover targets can be sized." };
+      }
+      plan.actions = [act("L2-B1", "Confirm your MediShield Life and check if you need an Integrated Shield Plan.")];
+      if (!isNum(i.dtpd_coverage_amount) || i.dtpd_coverage_amount < d.dtpdTarget) {
+        plan.actions.push(act("L2-B2", "Get term insurance for Death & TPD to reach " + fmtSGD(d.dtpdTarget) + " cover."));
+      }
+      if (!isNum(i.critical_illness_coverage_amount) || i.critical_illness_coverage_amount < d.ciTarget) {
+        plan.actions.push(act("L2-B3", "Add Critical Illness term cover to reach " + fmtSGD(d.ciTarget) + "."));
+      }
+      if (d.coverageCapConflict === true) {
+        plan.actions.push(act("L2-B4", "Full cover may exceed 15% of take-home — prioritise Death/TPD + DPS first, use term not bundled, and consider Direct Purchase Insurance."));
+      }
+      return plan;
+    }
+
+    if (lvl === 3) {
+      if (!isNum(d.investMinMonthly)) {
+        return { level: 3, ready: false, complete: false, actions: [],
+                 reason: "Enter your income to set your 10% investing floor." };
+      }
+      plan.actions = [
+        act("L3-C1", "Set up a monthly investment of at least " + fmtSGD(d.investMinMonthly) + " into a diversified low-cost ETF or a CPF top-up."),
+        act("L3-C2", "Automate it on payday so it happens without willpower.")
+      ];
+      return plan;
+    }
+
+    // Level 4 — concepts + official tools only, no regulated figures.
+    plan.level = 4;
+    plan.actions = [
+      act("L4-D1", "Use the CPF Home Purchase Planner to see what you can afford."),
+      act("L4-D2", "Use HDB's budget calculator before committing to a flat."),
+      act("L4-D3", "Make a CPF top-up for tax relief and retirement compounding.")
+    ];
+    return plan;
+  }
+
+  /* =================================================================
      SELF-TESTS (spec §7.1) — the exact values from the spec + the
      null-discipline edge cases. Logs one PASS/FAIL line on load.
      ================================================================= */
@@ -237,6 +320,31 @@
     // CC3: a required field null (premium) -> conflict false, no false alarm
     check("CC3 null premium -> conflict false",
       ccFlag({ dtpd_coverage_amount: 100000, monthly_insurance_premium: null }) === false);
+    // P1: action-plan generator — 2800/1400/4956 profile, exact values.
+    // Rounding rule: suggestedMonthly = max($50, nearest-$50 of
+    // min(shortfall/12, 20% take-home)) = max(50, round(287/50)*50) = 300.
+    (function () {
+      var inputs = {
+        monthly_take_home_income: 2800, monthly_expenses: 1400,
+        current_savings: 4956, monthly_insurance_premium: null,
+        dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+        monthly_investment_amount: null
+      };
+      var p = generatePlan({ inputs: inputs, derived: computeAll(inputs), currentLevel: 1, actions: {} });
+      check("P1 plan ready", p.ready === true && p.actions.length === 3);
+      check("P1 target6 8400", p.meta.target6 === 8400);
+      check("P1 shortfall 3444", p.meta.shortfall === 3444);
+      check("P1 suggestedMonthly 300 (nearest-$50 of min(287,560))", p.meta.suggestedMonthly === 300);
+      check("P1 monthsToTarget 12", p.meta.monthsToTarget === 12);
+      check("P1 A2 renders $300", p.actions[1].text.indexOf("$300") !== -1);
+      check("P1 A3 renders $8,400 and 12 months",
+        p.actions[2].text.indexOf("$8,400") !== -1 && p.actions[2].text.indexOf("12 months") !== -1);
+      var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
+        current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
+        critical_illness_coverage_amount: null, monthly_investment_amount: null },
+        derived: null, currentLevel: 1, actions: {} });
+      check("P1 null inputs -> ready:false, no actions", pNull.ready === false && pNull.actions.length === 0);
+    })();
     console.log(pass
       ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
       : "[app.js] self-tests: FAIL — see assertions above");
@@ -709,6 +817,15 @@
   // Read-only inspection surface for the staged Contract 3 variables
   // (Phase 4 will push these to Botpress; exposed now for verification).
   window.MFC.getUserVars = botpressUserVars;
+
+  // Action plan, generated deterministically from the live state
+  // (UI panel + getCurrentAction contract arrive in later phases).
+  window.MFC.generatePlan = function () { return generatePlan(state); };
+  // Pure variant for testing: pass { inputs, currentLevel, actions? }.
+  window.MFC.generatePlanFor = function (st) {
+    return generatePlan({ inputs: st.inputs, derived: computeAll(st.inputs),
+                          currentLevel: st.currentLevel || 1, actions: st.actions || {} });
+  };
 
   /* =================================================================
      STARTUP (Phase 2)
