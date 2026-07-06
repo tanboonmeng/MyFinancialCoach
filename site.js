@@ -211,6 +211,14 @@
       setText("consistency-label", metric.consistencyLabel);
       setText("consistency-unit", metric.consistencyUnit);
 
+      // Emergency-fund progress stays visible in the top stat row after
+      // Level 1 unlocks (app.js owns the value via fundNote).
+      var fundNoteEl = get("fund-note");
+      if (fundNoteEl) {
+        fundNoteEl.hidden = !state.fundNote;
+        if (state.fundNote) fundNoteEl.textContent = state.fundNote;
+      }
+
       if (state.allComplete) {
         setText("level", levels.length);
         setText("level-title", "All levels complete");

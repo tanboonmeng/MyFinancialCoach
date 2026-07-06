@@ -970,6 +970,17 @@ section[id] {
   color: var(--ink);
 }
 .dash-streak { display: inline-flex; align-items: center; gap: 0.4rem; }
+.dash-stat-note {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--brand-deep);
+  background: var(--brand-tint);
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  align-self: flex-start;
+}
 .flame-icon { width: 1.1rem; height: 1.1rem; fill: var(--gold); flex: none; }
 .dash-overall {
   margin-top: 0.5rem;
