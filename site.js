@@ -143,22 +143,13 @@
     var CIRCUMFERENCE = 326.7; // 2 * pi * r, r = 52
     var CHECK_SVG = '<svg viewBox="0 0 24 24" style="width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round"><path d="M20 6L9 17l-5-5"/></svg>';
 
-    // Level-aware framing for the consistency metric + hero caption. One
-    // check-in mechanic, but the label/unit/benchmark switch with the level
-    // so the metric always describes progress toward the CURRENT goal.
+    // Level-aware hero caption (the middle stat card is now the
+    // deterministic items-done metric fed by app.js — no sample framing).
     var LEVEL_METRICS = {
-      1: { consistencyLabel: "Check-ins on track",
-           consistencyUnit:  "saving check-ins",
-           heroCaption:      "MAS benchmark · 3 months of expenses (minimum safety net)" },
-      2: { consistencyLabel: "Steps on track",
-           consistencyUnit:  "protection steps",
-           heroCaption:      "MAS benchmark · 9x / 4x annual income cover" },
-      3: { consistencyLabel: "Contributions on track",
-           consistencyUnit:  "contributions",
-           heroCaption:      "MAS benchmark · invest at least 10% of take-home pay" },
-      4: { consistencyLabel: "Milestones on track",
-           consistencyUnit:  "milestones",
-           heroCaption:      "Plan with official HDB/CPF calculators" }
+      1: { heroCaption: "MAS benchmark · 3 months of expenses (minimum safety net)" },
+      2: { heroCaption: "MAS benchmark · 9x / 4x annual income cover" },
+      3: { heroCaption: "MAS benchmark · invest at least 10% of take-home pay" },
+      4: { heroCaption: "Plan with official HDB/CPF calculators" }
     };
 
     // Sample per-level state. Ryan overwrites the active level via updateDashboard().
@@ -197,10 +188,8 @@
         doneCount = state.allComplete ? levels.length : cur - 1;
       }
 
-      // Level-aware framing (label + unit + benchmark caption) from the map.
+      // Level-aware benchmark caption from the map (used further down).
       var metric = LEVEL_METRICS[state.allComplete ? levels.length : cur];
-      setText("consistency-label", metric.consistencyLabel);
-      setText("consistency-unit", metric.consistencyUnit);
 
       // (The stat-tile fund pill was removed 2026-07-06 as redundant —
       // fund progress lives in the focus-card bar and the L1 Done rows.)
@@ -337,7 +326,8 @@
         l1.pct = 0;
         l1.detail = "Enter your numbers below to see your emergency-fund progress.";
         l1.next = "Start with Level 1 — build your emergency fund.";
-        setText("streak", 0);
+        setText("items-done", "—");
+        setText("items-total", "—");
         var subEl = section.querySelector(".dash-sub");
         if (subEl) subEl.innerHTML = "Fresh start — enter your numbers below to see live progress.";
         if (!section.hidden) render();
@@ -399,7 +389,7 @@
         if (data.savings || data.focus) {
           // Real numbers are in: relabel the sub line (streak stays sample).
           var sub = section.querySelector(".dash-sub");
-          if (sub) sub.innerHTML = "Live numbers — the weekly streak stays sample data until the Telegram loop feeds it.";
+          if (sub) sub.innerHTML = "Updated as you complete each step.";
         }
       }
       if (Array.isArray(data.levels)) {
@@ -416,10 +406,15 @@
         state.fundPct = (typeof data.savings.pct === "number") ? data.savings.pct : null;
         state.fundTarget = (typeof data.savings.target === "number") ? data.savings.target : null;
       }
-      if (typeof data.streakCount !== "undefined" && data.streakCount !== null) {
-        setText("streak", data.streakCount);
+      // "This level" stat card: deterministic items-done from app.js
+      // (same refresh path as the focus ring). total 0 = level not ready
+      // yet -> keep the neutral placeholder, never a fake denominator.
+      if (data.itemsDone && typeof data.itemsDone === "object") {
+        var itd = data.itemsDone;
+        var itReady = typeof itd.total === "number" && itd.total > 0;
+        setText("items-done", itReady ? itd.done : "—");
+        setText("items-total", itReady ? itd.total : "—");
       }
-      if (typeof data.streakWeeks !== "undefined") setText("streak", data.streakWeeks);
       if (!section.hidden) render();
       // real level-up from app.js gatekeeping -> existing celebration toast
       if (typeof data.celebrateLevel === "number") celebrate(data.celebrateLevel);

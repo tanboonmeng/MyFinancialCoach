@@ -977,8 +977,6 @@ section[id] {
   font-size: 1.1rem;
   color: var(--ink);
 }
-.dash-streak { display: inline-flex; align-items: center; gap: 0.4rem; }
-.flame-icon { width: 1.1rem; height: 1.1rem; fill: var(--gold); flex: none; }
 .dash-overall {
   margin-top: 0.5rem;
   height: 0.45rem;

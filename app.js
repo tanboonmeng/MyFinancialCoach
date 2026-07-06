@@ -912,6 +912,9 @@
     focus.pct = ip.pct;                 // items done / total (null when not ready)
     focus.ringCaption = "level complete";
     payload.focus = focus;
+    // Middle stat card: same items-done source as the ring. total === 0
+    // means the level isn't ready yet -> site.js keeps its placeholder.
+    payload.itemsDone = { done: ip.done, total: ip.total };
     if (isNum(celebrateLevel)) payload.celebrateLevel = celebrateLevel;
     window.MFC.updateDashboard(payload);
   }
