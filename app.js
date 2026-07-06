@@ -783,10 +783,16 @@
       levels: [1, 2, 3, 4].map(function (id) {
         return {
           id: id,
+          // the final level has no successor, so "current" must yield to
+          // "done" when its own checklist is complete
           state: id < state.currentLevel ? "done"
-               : id === state.currentLevel ? "current" : "locked"
+               : id === state.currentLevel
+                 ? (levelComplete(id, state) ? "done" : "current")
+                 : "locked"
         };
-      })
+      }),
+      // everything done: lets the dashboard render its all-complete state
+      allComplete: state.currentLevel === 4 && levelComplete(4, state)
     };
     var focus = focusFor(state.currentLevel, state.inputs, d);
     if (focus) payload.focus = focus;
@@ -1039,6 +1045,9 @@
         }
       }
     }
+    // capture the final-level completion transition before writing
+    var allBefore = state.currentLevel === 4 && levelComplete(4, state);
+
     state.actions[id] = status;
     state.lastUpdated = new Date().toISOString();
     saveState();
@@ -1054,6 +1063,12 @@
       pushLevelSync(next);           // Contract 4 (no-op while flag OFF)
       console.log("[app.js] level " + prev + " complete — advanced to " + next);
     } else {
+      // Level 4 has no successor: celebrate when its checklist completes
+      var allAfter = state.currentLevel === 4 && levelComplete(4, state);
+      if (!allBefore && allAfter) {
+        pushDashboard(4);            // toast reads "All four levels complete!"
+        console.log("[app.js] level 4 complete — all levels done");
+      }
       pushBotpressVars("plan");      // keep the coach's variables fresh
     }
     renderPlan();

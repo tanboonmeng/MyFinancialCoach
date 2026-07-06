@@ -385,6 +385,9 @@
         state.currentLevel = Math.min(Math.max(data.currentLevel, 1), levels.length);
         state.allComplete = false;
       }
+      // app.js signals every level's checklist is done -> render the
+      // existing all-complete state (100% ring, all cards Done)
+      if (data.allComplete === true) state.allComplete = true;
       var active = levels[state.currentLevel - 1];
       if (active) {
         if (typeof data.savingsProgress !== "undefined") {
