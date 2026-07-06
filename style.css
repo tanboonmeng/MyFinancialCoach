@@ -1583,17 +1583,6 @@ section[id] {
 
 /* ---------- App page (workspace) ---------- */
 .app-nav-right { display: flex; align-items: center; gap: 1rem; }
-.user-chip {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: var(--ink-soft);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  padding: 0.3rem 0.7rem;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.user-chip strong { color: var(--brand-deep); }
 
 .app-main { padding: 2.5rem 0 4rem; }
 .app-head { margin-bottom: 2rem; }
@@ -1630,10 +1619,6 @@ section[id] {
    proactive message preview are hidden (only app.html loads the widget). */
 .bpFabWrapper,
 .bpMessagePreview { display: none; }
-
-@media (max-width: 480px) {
-  .chip-label { display: none; }
-}
 
 /* ---------- How it works (architecture strip) ---------- */
 .how-intro {

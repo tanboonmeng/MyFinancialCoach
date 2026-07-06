@@ -367,7 +367,7 @@
         l1.next = "Start with Level 1 — build your emergency fund.";
         setText("streak", 0);
         var subEl = section.querySelector(".dash-sub");
-        if (subEl) subEl.innerHTML = "Fresh start for <code>user1</code> — enter your numbers below to see live progress.";
+        if (subEl) subEl.innerHTML = "Fresh start — enter your numbers below to see live progress.";
         if (!section.hidden) render();
         var rt = get("toast");
         if (rt) {
@@ -427,7 +427,7 @@
         if (data.savings || data.focus) {
           // Real numbers are in: relabel the sub line (streak stays sample).
           var sub = section.querySelector(".dash-sub");
-          if (sub) sub.innerHTML = "Live numbers for <code>user1</code> — the weekly streak stays sample data until the Telegram loop feeds it.";
+          if (sub) sub.innerHTML = "Live numbers — the weekly streak stays sample data until the Telegram loop feeds it.";
         }
       }
       if (Array.isArray(data.levels)) {
