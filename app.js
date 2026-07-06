@@ -78,15 +78,19 @@
   // Compute every derived value from the 7 raw inputs (nulls propagate).
   function computeAll(inputs) {
     var annual = annualIncome(inputs.monthly_take_home_income);
+    var targetMin = emergencyTargetMin(inputs.monthly_expenses);
     var targetFull = emergencyTargetFull(inputs.monthly_expenses);
     var cap = premiumCapMonthly(inputs.monthly_take_home_income);
     var investMin = investMinMonthly(inputs.monthly_take_home_income);
     var dtpd = dtpdTarget(annual);
     var ci = ciTarget(annual);
     return {
-      emergencyTargetMin:  emergencyTargetMin(inputs.monthly_expenses),
-      emergencyTargetFull: targetFull,
-      savingsProgressPct:  savingsProgressPct(inputs.current_savings, targetFull),
+      emergencyTargetMin:  targetMin,
+      emergencyTargetFull: targetFull,   // internal only (A2 transfer sizing); never displayed
+      // SINGLE 3-MONTH TARGET (amendment 2026-07-06): progress measures
+      // against emergencyTargetMin — ring, plan, fund note and the
+      // Botpress payload all read this value.
+      savingsProgressPct:  savingsProgressPct(inputs.current_savings, targetMin),
       annualIncome:        annual,
       dtpdTarget:          dtpd,
       ciTarget:            ci,
@@ -156,21 +160,17 @@
       var suggestedMonthly = Math.max(50, Math.round(raw / 50) * 50);
       var monthsToTarget = suggestedMonthly > 0 ? Math.ceil(shortfall / suggestedMonthly) : 0;
 
+      // SINGLE 3-MONTH TARGET (amendment): one target everywhere — the
+      // item, the ring and the pct all measure emergencyTargetMin.
       var a3 = act("L1-A3",
-        "Build your fund to " + fmtSGD(target6) + " (6 months of expenses)" +
-        (monthsToTarget > 0 ? " — about " + monthsToTarget + " months at this rate." : "."),
-        "auto", target6);
+        "Build your 3-month safety net (" + fmtSGD(targetMin) + "). Completes automatically when you reach it.",
+        "auto", targetMin);
       a3.auto = true;
-      a3.progressPct = isNum(d.savingsProgressPct) ? d.savingsProgressPct : 0; // vs 6x, matches the ring
-      // Completion vs display split (amendment): the item completes at
-      // 3 MONTHS (emergencyTargetMin); the ring keeps measuring the 6x
-      // journey. Latched via the persisted status map (no-demote).
+      a3.progressPct = isNum(d.savingsProgressPct) ? d.savingsProgressPct : 0; // vs 3x, matches the ring
+      // Completes + latches (no-demote) at emergencyTargetMin.
       a3.status = (statuses["L1-A3"] === "done" ||
                    (isNum(targetMin) && i.current_savings >= targetMin))
                   ? "done" : "not_started";
-      a3.autoHint = "Build at least 3 months of expenses (" + fmtSGD(targetMin) +
-        ") to complete this step — 6 months (" + fmtSGD(target6) +
-        ") is the ideal. Completes automatically at 3 months.";
 
       return { ready: true,
         meta: { target6: target6, targetMin: targetMin, shortfall: shortfall,
@@ -361,9 +361,10 @@
       });
       check("S5 no L1-A4 (SSB) and no L1-A0 remain",
         allIds.indexOf("L1-A4") === -1 && allIds.indexOf("L1-A0") === -1);
-      check("S6 dynamic values: A2 $300; A3 hint exact per amendment",
+      check("S6 dynamic values: A2 $300; A3 exact single-target text",
         l1.actions[1].text.indexOf("$300") !== -1 &&
-        l1.actions[2].autoHint === "Build at least 3 months of expenses ($4,200) to complete this step — 6 months ($8,400) is the ideal. Completes automatically at 3 months.");
+        l1.actions[2].text === "Build your 3-month safety net ($4,200). Completes automatically when you reach it." &&
+        l1.actions[2].amount === 4200);
       check("S7 L1 not ready on null inputs",
         buildLevel(1, { inputs: { monthly_take_home_income: null, monthly_expenses: null,
           current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
@@ -422,6 +423,37 @@
         return found === "done";
       });
       check("N7 all " + completable.length + " attest/learn items persist done via the status map", okAll === true);
+
+      // Single 3-month target (amendment): pct is 3x-based end to end
+      check("T1 computeAll pct vs 3x: savings 3024 -> 72%",
+        computeAll(mk({ current_savings: 3024 }).inputs).savingsProgressPct === 72);
+      check("T2 computeAll pct vs 3x: savings 5000 -> 100% (clamped)",
+        computeAll(mk({ current_savings: 5000 }).inputs).savingsProgressPct === 100);
+      check("T3 1.3 done at >= 3x with pct 100",
+        (function () {
+          var lv = buildLevel(1, mk({ current_savings: 5000 }));
+          return lv.actions[2].status === "done" && lv.actions[2].progressPct === 100;
+        })());
+      // Audit: no user-facing string references the 6-month figure
+      check("T4 no '6-month'/'6 months'/'$8,400' in any rendered plan or focus output",
+        (function () {
+          var texts = [];
+          var st6 = mk({ current_savings: 5000 });
+          [1, 2, 3, 4].forEach(function (n) {
+            buildLevel(n, st6).actions.forEach(function (a) {
+              texts.push(a.text || ""); texts.push(a.autoHint || "");
+            });
+          });
+          [2, 3, 4].forEach(function (n) {
+            var f = focusFor(n, st6.inputs, st6.derived) || {};
+            texts.push(f.detail || ""); texts.push(f.next || "");
+          });
+          texts.push(fundProgressNote(st6.derived, 2) || "");
+          return texts.every(function (t) {
+            return t.indexOf("6-month") === -1 && t.indexOf("6 months") === -1 &&
+                   t.indexOf("$8,400") === -1;
+          });
+        })());
     })();
     // Fund-note + focus-ring honesty (rewording per amendment)
     (function () {
@@ -430,8 +462,8 @@
         dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
         monthly_investment_amount: null };
       var d5000 = computeAll(in5000);
-      check("F1 fund note exact wording per amendment",
-        fundProgressNote(d5000, 2) === "Emergency fund · 60% of $8,400 (aim: 3 months min, 6 months ideal)");
+      check("F1 fund note exact wording per single-target amendment",
+        fundProgressNote(d5000, 2) === "Emergency fund · 100% of $4,200 (3-month minimum safety net)");
       check("F2 fund note null while still on level 1",
         fundProgressNote(d5000, 1) === null);
       var dNull = computeAll({ monthly_take_home_income: null, monthly_expenses: null,
@@ -596,7 +628,11 @@
     var num = function (v) { return isNum(v) ? v : ""; };
     return {
       currentLevel:        state.currentLevel,
-      emergencyTarget:     num(d.emergencyTargetFull),
+      // Single 3-month target (amendment): emergencyTarget now carries
+      // emergencyTargetMin so the coach's target matches savingsProgress
+      // and the dashboard. SAMMI note: Contract 3's emergencyTarget was
+      // previously the 6x figure.
+      emergencyTarget:     num(d.emergencyTargetMin),
       currentSavings:      num(i.current_savings),
       savingsProgress:     isNum(d.savingsProgressPct) ? (d.savingsProgressPct + "%") : "",
       insuranceTarget:     num(d.dtpdTarget),
@@ -726,9 +762,9 @@
   // so "Done" is never mistaken for "fund complete". Null-safe.
   function fundProgressNote(d, currentLevel) {
     if (currentLevel <= 1) return null;
-    if (!isNum(d.savingsProgressPct) || !isNum(d.emergencyTargetFull)) return null;
-    return "Emergency fund · " + d.savingsProgressPct + "% of " + fmtSGD(d.emergencyTargetFull) +
-           " (aim: 3 months min, 6 months ideal)";
+    if (!isNum(d.savingsProgressPct) || !isNum(d.emergencyTargetMin)) return null;
+    return "Emergency fund · " + d.savingsProgressPct + "% of " + fmtSGD(d.emergencyTargetMin) +
+           " (3-month minimum safety net)";
   }
 
   function pushDashboard(celebrateLevel) {
@@ -740,7 +776,8 @@
       fundNote: fundProgressNote(d, state.currentLevel),
       savings: {
         current: state.inputs.current_savings,
-        target: isNum(d.emergencyTargetFull) ? d.emergencyTargetFull : null,
+        // single 3-month target: the ring/bar target is emergencyTargetMin
+        target: isNum(d.emergencyTargetMin) ? d.emergencyTargetMin : null,
         pct: isNum(d.savingsProgressPct) ? d.savingsProgressPct : null
       },
       levels: [1, 2, 3, 4].map(function (id) {

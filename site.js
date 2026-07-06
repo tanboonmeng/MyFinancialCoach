@@ -158,7 +158,7 @@
     var LEVEL_METRICS = {
       1: { consistencyLabel: "Check-ins on track",
            consistencyUnit:  "saving check-ins",
-           heroCaption:      "MAS benchmark · 3–6 months of expenses" },
+           heroCaption:      "MAS benchmark · 3 months of expenses (minimum safety net)" },
       2: { consistencyLabel: "Steps on track",
            consistencyUnit:  "protection steps",
            heroCaption:      "MAS benchmark · 9x / 4x annual income cover" },
@@ -173,8 +173,8 @@
     // Sample per-level state. Ryan overwrites the active level via updateDashboard().
     var levels = [
       { title: "Emergency fund", pct: 59,
-        detail: "$4,956 saved of $8,400 sample target",
-        next: "You're 59% there — keep going to unlock insurance." },
+        detail: "$2,478 saved of $4,200 sample target",
+        next: "You're 59% of the way to your 3-month safety net." },
       { title: "Insurance protection", pct: 8,
         detail: "Just getting started on protection.",
         next: "Set up your income protection to grow your safety net." },
@@ -271,7 +271,7 @@
         // an explicit levels[] payload (spec §3c) wins over derivation
         var st = override ? override[n] : null;
         // L1's bench line shows live fund progress once the level is done
-        // ("Unlocked at 3× — fund 60% of $8,400"); default text otherwise.
+        // ("Emergency fund · 100% of $4,200 ..."); default text otherwise.
         var bench = li.querySelector(".dash-lvl-bench");
         if (bench && !bench.dataset.defaultText) bench.dataset.defaultText = bench.textContent;
         var isDone = st === "done" || (!st && (state.allComplete || n < cur));
@@ -408,7 +408,7 @@
           } else {
             active.pct = (typeof s.pct === "number") ? Math.min(Math.max(s.pct, 0), 100) : 0;
             active.detail = fmtMoney(s.current) + " saved of " + fmtMoney(s.target) + " target";
-            if (!data.next) active.next = "You're " + active.pct + "% of the way to your full 6-month target.";
+            if (!data.next) active.next = "You're " + active.pct + "% of the way to your 3-month safety net (" + fmtMoney(s.target) + ").";
           }
         }
         // focus{} from app.js: display-ready content for the current level.
