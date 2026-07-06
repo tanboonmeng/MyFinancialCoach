@@ -933,10 +933,14 @@
 
     recompute();
 
-    var missing = FIELDS.filter(function (k) { return state.inputs[k] === null; }).length;
+    // Blank-hint counts only the three panel fields; the other four
+    // (premium, DTPD, CI, investing) arrive via the coach chat.
+    var CORE_FIELDS = ["monthly_take_home_income", "monthly_expenses", "current_savings"];
+    var missing = CORE_FIELDS.filter(function (k) { return state.inputs[k] === null; }).length;
     showEntryStatus("saved",
       "Got it — " + accepted + " number" + (accepted === 1 ? "" : "s") + " saved." +
-      (missing ? " (" + missing + " of 7 still blank — add them any time.)" : " All 7 in — nice!"));
+      (missing ? " (" + missing + " of 3 still blank — add them any time.)"
+               : " Basics all in — share insurance and investing details with your coach any time."));
     return { ok: true, derived: state.derived };
   };
 
