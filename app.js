@@ -545,6 +545,10 @@
     derived: {},         // computeAll() output
     currentLevel: 1,     // derived from items-based gating (deriveCurrentLevel)
     actions: {},         // action-plan statuses: id -> not_started|started|done
+    settings: {          // coach-event opt-in — BOTH must be set to fire;
+      tgChatId: "",      // either blank means events are OFF (no network)
+      n8nWebhook: ""
+    },
     lastUpdated: null
   };
   FIELDS.forEach(function (k) { state.inputs[k] = null; });
@@ -563,6 +567,7 @@
         derived: state.derived,
         currentLevel: state.currentLevel,
         actions: state.actions,
+        settings: state.settings,
         lastUpdated: state.lastUpdated
       }));
     } catch (e) { /* private mode / quota — state stays in memory */ }
@@ -593,6 +598,12 @@
           state.actions[id] = saved.actions[id];
         }
       });
+    }
+    // settings are additive to the v1 schema — older saves simply keep
+    // the blank defaults (events OFF) instead of forcing a version bump.
+    if (saved.settings && typeof saved.settings === "object") {
+      if (typeof saved.settings.tgChatId === "string") state.settings.tgChatId = saved.settings.tgChatId;
+      if (typeof saved.settings.n8nWebhook === "string") state.settings.n8nWebhook = saved.settings.n8nWebhook;
     }
     if (typeof saved.lastUpdated === "string") state.lastUpdated = saved.lastUpdated;
   }
@@ -808,6 +819,55 @@
     }
   }
 
+  /* =================================================================
+     COACH EVENTS — item_done / level_done to the self-hosted n8n
+     webhook. Opt-in: fires ONLY when both settings.tgChatId and
+     settings.n8nWebhook are set; either blank = hard no-op. The app
+     NEVER calls Telegram directly — the bot token stays server-side
+     in n8n; we only pass the chat id through. Fire-and-forget: never
+     blocks the UI, never throws (try/catch + .catch(()=>{})).
+     `var fn = function` so the self-tests can swap in a capture mock.
+     ================================================================= */
+  var fireCoachEvent = function (payload) {
+    try {
+      var s = state.settings || {};
+      if (!s.tgChatId || !s.n8nWebhook) return; // opt-in not configured
+      fetch(s.n8nWebhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(Object.assign({ chatId: s.tgChatId }, payload)),
+        keepalive: true // let an in-flight send survive navigation
+      }).catch(function () { /* network failure is deliberately silent */ });
+    } catch (e) { /* never blocks or throws into the UI */ }
+  };
+
+  function emitItemDone(action) {
+    var na = nextAction(state);
+    fireCoachEvent({
+      event: "item_done",
+      itemId: action.id,
+      itemText: action.text,
+      level: action.level,
+      nextActionText: na ? na.text : null
+    });
+  }
+
+  // Session-scope dedupe on top of the monotone currentLevel guards:
+  // one level_done per level, whichever call site gets there first.
+  var emittedLevels = {};
+
+  function emitLevelDone(levelNum, levelName) {
+    if (emittedLevels[levelNum]) return;
+    emittedLevels[levelNum] = true;
+    var na = nextAction(state);
+    fireCoachEvent({
+      event: "level_done",
+      level: levelNum,
+      levelName: levelName,
+      nextActionText: na ? na.text : null
+    });
+  }
+
   // UX note for the completed Level 1 rows: L1 unlocks at 3x expenses,
   // but the 6x stretch target keeps filling — keep that progress visible
   // so "Done" is never mistaken for "fund complete". Null-safe.
@@ -861,12 +921,19 @@
 
     // Latch the 1.3 auto-milestone at 3 MONTHS (emergencyTargetMin) into
     // the persisted status map — no-demote: a later savings dip can never
-    // re-lock the item or Level 2 (amendment 2026-07-06).
+    // re-lock the item or Level 2 (amendment 2026-07-06). The `!== "done"`
+    // guard doubles as the once-only gate for the item_done event: on
+    // every later save (and on reload) the latch is already done, so the
+    // emit below can never re-fire.
+    var autoLatched = null;
     if (isNum(state.derived.emergencyTargetMin) &&
         isNum(state.inputs.current_savings) &&
         state.inputs.current_savings >= state.derived.emergencyTargetMin &&
         state.actions["L1-A3"] !== "done") {
       state.actions["L1-A3"] = "done";
+      autoLatched = buildLevel(1, state).actions.filter(function (a) {
+        return a.id === "L1-A3";
+      })[0] || null;
     }
 
     // Items-based gating: level = first incomplete level (forward-only;
@@ -875,6 +942,13 @@
     var next = Math.max(prev, deriveCurrentLevel(state));
     var leveledUp = next > prev;
     state.currentLevel = next;
+
+    // Coach events — item first, then any level(s) it closed, so the
+    // user reads the messages in that order.
+    if (autoLatched) emitItemDone(autoLatched);
+    if (leveledUp) {
+      for (var L = prev; L < next; L++) emitLevelDone(L, PLAN_TITLES[L]);
+    }
 
     state.lastUpdated = new Date().toISOString();
     saveState();
@@ -1096,21 +1170,35 @@
     // Handler-level guard: auto items (L1-A3) derive their status from
     // the numbers — a manual/forged write can never set OR overwrite
     // them, regardless of which level is current. learn/attest allowed.
+    // The same walk captures the action object for the item_done emit.
+    var theAction = null;
     for (var n = 1; n <= 4; n++) {
       var lvv = buildLevel(n, state);
       for (var k = 0; k < lvv.actions.length; k++) {
-        if (lvv.actions[k].id === id && lvv.actions[k].type === "auto") {
-          renderPlan(); // refresh any stale buttons
-          return;
+        if (lvv.actions[k].id === id) {
+          if (lvv.actions[k].type === "auto") {
+            renderPlan(); // refresh any stale buttons
+            return;
+          }
+          theAction = lvv.actions[k];
         }
       }
     }
     // capture the final-level completion transition before writing
     var allBefore = state.currentLevel === 4 && levelComplete(4, state);
+    // prior status distinguishes a first-time transition from a re-write
+    var prior = state.actions[id];
 
     state.actions[id] = status;
     state.lastUpdated = new Date().toISOString();
     saveState();
+
+    // Coach event: fire ONLY on the transition INTO "done" — never on
+    // re-writes of an already-done item, never on "started". Emitted
+    // before the level check below so item_done precedes level_done.
+    if (status === "done" && prior !== "done" && theAction) {
+      emitItemDone(theAction);
+    }
 
     // Items-based gating: advancing = the derived first-incomplete level.
     var prev = state.currentLevel;
@@ -1118,6 +1206,8 @@
     if (next > prev) {
       state.currentLevel = next;
       saveState();
+      // level_done AFTER the item's item_done above — messages in order
+      for (var L = prev; L < next; L++) emitLevelDone(L, PLAN_TITLES[L]);
       pushDashboard(prev);           // existing celebration toast for the completed level
       pushBotpressVars("plan");
       pushLevelSync(next);           // Contract 4 (no-op while flag OFF)
@@ -1126,6 +1216,7 @@
       // Level 4 has no successor: celebrate when its checklist completes
       var allAfter = state.currentLevel === 4 && levelComplete(4, state);
       if (!allBefore && allAfter) {
+        emitLevelDone(4, PLAN_TITLES[4]); // after the closing item's item_done
         pushDashboard(4);            // toast reads "All four levels complete!"
         console.log("[app.js] level 4 complete — all levels done");
       } else {
@@ -1270,6 +1361,153 @@
   window.MFC.getPlan = function () {
     return generatePlan(state).actions;
   };
+  // Coach-event opt-in: set BOTH to enable item_done/level_done posts to
+  // the self-hosted n8n webhook; pass "" for either to switch back off.
+  // The Telegram token never appears here — it stays server-side in n8n.
+  window.MFC.setCoachEventSettings = function (tgChatId, n8nWebhook) {
+    state.settings.tgChatId = (typeof tgChatId === "string") ? tgChatId.trim() : "";
+    state.settings.n8nWebhook = (typeof n8nWebhook === "string") ? n8nWebhook.trim() : "";
+    saveState();
+    return { tgChatId: state.settings.tgChatId, n8nWebhook: state.settings.n8nWebhook };
+  };
+
+  /* =================================================================
+     COACH-EVENT SELF-TESTS — mock fireCoachEvent (capture, no network),
+     stub every other side effect, drive the full item/level lifecycle
+     against the real handlers, then restore pristine state BEFORE
+     loadState() so the user's saved data is untouched.
+     ================================================================= */
+  (function eventSelfTest() {
+    var pass = true, total = 0;
+    function check(label, cond) {
+      total++;
+      console.assert(cond, "[app.js event-test FAILED] " + label);
+      if (!cond) pass = false;
+    }
+
+    // ---- sandbox: stubs + snapshots ------------------------------
+    var savedLS = null;
+    try { savedLS = localStorage.getItem(STATE_KEY); } catch (e) {}
+    var snap = JSON.parse(JSON.stringify(state));
+    var realFire = fireCoachEvent, realSave = saveState,
+        realDash = pushDashboard, realVars = pushBotpressVars,
+        realPlan = renderPlan, realSync = pushLevelSync;
+    var captured = [];
+    fireCoachEvent = function (p) { captured.push(p); };
+    saveState = function () {};
+    pushDashboard = function () {};
+    pushBotpressVars = function () {};
+    renderPlan = function () {};
+    pushLevelSync = function () {};
+
+    state.inputs = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+      current_savings: 1000, monthly_insurance_premium: null,
+      dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+      monthly_investment_amount: null };
+    state.derived = computeAll(state.inputs);
+    state.currentLevel = 1;
+    state.actions = {};
+    state.settings = { tgChatId: "", n8nWebhook: "" };
+
+    // E1: attest item -> exactly one item_done, correct text + next
+    setActionStatus("L1-A1", "done");
+    check("E1 one item_done on attest done", captured.length === 1 &&
+      captured[0].event === "item_done" && captured[0].itemId === "L1-A1" &&
+      captured[0].level === 1 &&
+      captured[0].itemText === "Open a high-yield savings account as your emergency-fund home." &&
+      captured[0].nextActionText === "Set up an automatic $550 transfer on payday into that savings account.");
+
+    // E2: re-write of an already-done item and a "started" write fire nothing
+    setActionStatus("L1-A1", "done");
+    setActionStatus("L1-A2", "started");
+    check("E2 re-write / started fire nothing", captured.length === 1);
+
+    // E3: auto item 1.3 latches once at target, never re-fires
+    state.inputs.current_savings = 4200;
+    recompute();
+    check("E3 auto latch fires one item_done", captured.length === 2 &&
+      captured[1].event === "item_done" && captured[1].itemId === "L1-A3" &&
+      captured[1].nextActionText === "Set up an automatic $350 transfer on payday into that savings account.");
+    recompute(); // later save — latch guard must block a re-fire
+    check("E3b latch never re-fires on later saves", captured.length === 2);
+
+    // E4: closing item of a level -> item_done THEN level_done, in order
+    setActionStatus("L1-A2", "done");
+    setActionStatus("L1-A5", "done");
+    setActionStatus("L1-A6", "done"); // closes Level 1
+    var l1close = captured.slice(-2);
+    check("E4 item_done then level_done on L1 close",
+      captured.length === 6 &&
+      l1close[0].event === "item_done" && l1close[0].itemId === "L1-A6" &&
+      l1close[1].event === "level_done" && l1close[1].level === 1 &&
+      l1close[1].levelName === "Emergency fund & money management" &&
+      l1close[0].nextActionText === "Learn what baseline protection means." &&
+      l1close[1].nextActionText === "Learn what baseline protection means.");
+
+    // run the rest of the journey to the final level
+    ["L2-B1L", "L2-B2", "L2-B3", "L2-B4L", "L2-B5",
+     "L3-C0", "L3-C2L", "L3-C1", "L4-D1", "L4-D2"].forEach(function (id) {
+      setActionStatus(id, "done");
+    });
+    setActionStatus("L4-D3", "done"); // closes Level 4 — the final level
+    var l4close = captured.slice(-2);
+
+    // E5: final close -> nextActionText null on both events, item first
+    check("E5 final close: item_done then level_done, nextActionText null",
+      l4close[0].event === "item_done" && l4close[0].itemId === "L4-D3" &&
+      l4close[0].nextActionText === null &&
+      l4close[1].event === "level_done" && l4close[1].level === 4 &&
+      l4close[1].levelName === "Home & retirement" &&
+      l4close[1].nextActionText === null);
+
+    // E6: exactly one item_done per item, one level_done per level
+    var items = captured.filter(function (p) { return p.event === "item_done"; });
+    var levels = captured.filter(function (p) { return p.event === "level_done"; });
+    check("E6 16 item_done, 4 level_done, levels 1-4 in order",
+      items.length === 16 && levels.length === 4 &&
+      levels.map(function (p) { return p.level; }).join(",") === "1,2,3,4");
+
+    // E7: the REAL fireCoachEvent — blank settings mean no fetch at all
+    var realFetch = window.fetch, fetchCalls = [];
+    window.fetch = function (url, opts) {
+      fetchCalls.push({ url: url, opts: opts });
+      return { catch: function () {} };
+    };
+    realFire({ event: "probe" });                       // both blank
+    state.settings = { tgChatId: "123", n8nWebhook: "" };
+    realFire({ event: "probe" });                       // webhook blank
+    check("E7 blank settings -> no fetch attempted", fetchCalls.length === 0);
+    state.settings = { tgChatId: "123", n8nWebhook: "https://n8n.example/hook" };
+    realFire({ event: "probe" });
+    var sent = fetchCalls[0] && JSON.parse(fetchCalls[0].opts.body);
+    check("E7b configured -> one POST, chatId merged, keepalive, no TG token",
+      fetchCalls.length === 1 &&
+      fetchCalls[0].url === "https://n8n.example/hook" &&
+      fetchCalls[0].opts.method === "POST" &&
+      fetchCalls[0].opts.keepalive === true &&
+      sent.chatId === "123" && sent.event === "probe");
+    window.fetch = realFetch;
+
+    // spec printout: the captured payloads for level-closing transitions
+    console.log("[app.js] L1-close payloads: " + JSON.stringify(l1close));
+    console.log("[app.js] L4-close payloads: " + JSON.stringify(l4close));
+
+    // ---- restore: stubs back, pristine state, dedupe map cleared --
+    fireCoachEvent = realFire; saveState = realSave;
+    pushDashboard = realDash; pushBotpressVars = realVars;
+    renderPlan = realPlan; pushLevelSync = realSync;
+    state.inputs = snap.inputs; state.derived = snap.derived;
+    state.currentLevel = snap.currentLevel; state.actions = snap.actions;
+    state.settings = snap.settings; state.lastUpdated = snap.lastUpdated;
+    emittedLevels = {};
+    try {
+      if (savedLS === null) localStorage.removeItem(STATE_KEY);
+      else localStorage.setItem(STATE_KEY, savedLS);
+    } catch (e) {}
+
+    console.log("[app.js] event self-tests: " + (pass ? "PASS" : "FAIL") +
+                " (" + total + "/" + total + " checks" + (pass ? "" : " — see failures above") + ")");
+  })();
 
   /* =================================================================
      STARTUP (Phase 2)
