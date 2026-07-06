@@ -181,10 +181,14 @@
       var monthsToTarget = Math.ceil(shortfall / suggestedMonthly);
       plan.meta = { target6: target6, shortfall: shortfall,
                     suggestedMonthly: suggestedMonthly, monthsToTarget: monthsToTarget };
+      // Auto-transfer binds to the SAVINGS ACCOUNT only — SSBs are bought
+      // in manual monthly issues, so they are the optional final step,
+      // never the auto-transfer destination.
       plan.actions = [
-        act("L1-A1", "Open a high-yield savings account or Singapore Savings Bond (SSB) for your emergency fund."),
-        act("L1-A2", "Set up an automatic transfer of " + fmtSGD(suggestedMonthly) + " on payday.", suggestedMonthly),
-        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6)
+        act("L1-A1", "Open a high-yield savings account as your emergency-fund home."),
+        act("L1-A2", "Set up an automatic " + fmtSGD(suggestedMonthly) + " transfer on payday into that savings account.", suggestedMonthly),
+        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6),
+        act("L1-A4", "(Optional, once your buffer grows) Move a portion into Singapore Savings Bonds (SSBs) — government-guaranteed and exitable any month — to earn more while staying liquid.")
       ];
       return plan;
     }
@@ -333,7 +337,7 @@
         monthly_investment_amount: null
       };
       var p = generatePlan({ inputs: inputs, derived: computeAll(inputs), currentLevel: 1, actions: {} });
-      check("P1 plan ready", p.ready === true && p.actions.length === 3);
+      check("P1 plan ready (4 actions incl. optional SSB)", p.ready === true && p.actions.length === 4);
       check("P1 target6 8400", p.meta.target6 === 8400);
       check("P1 shortfall 3444", p.meta.shortfall === 3444);
       check("P1 suggestedMonthly 300 (nearest-$50 of min(287,560))", p.meta.suggestedMonthly === 300);
@@ -341,6 +345,15 @@
       check("P1 A2 renders $300", p.actions[1].text.indexOf("$300") !== -1);
       check("P1 A3 renders $8,400 and 12 months",
         p.actions[2].text.indexOf("$8,400") !== -1 && p.actions[2].text.indexOf("12 months") !== -1);
+      check("P1 A4 is the optional SSB step",
+        p.actions[3].id === "L1-A4" &&
+        p.actions[3].text.indexOf("Optional") !== -1 &&
+        p.actions[3].text.indexOf("Singapore Savings Bonds") !== -1 &&
+        p.actions[3].amount === null);
+      check("P1 auto-transfer binds to the savings account only",
+        p.actions[1].text.indexOf("savings account") !== -1 &&
+        p.actions[1].text.indexOf("SSB") === -1 &&
+        p.actions[3].text.indexOf("automatic") === -1);
       var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
         current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
         critical_illness_coverage_amount: null, monthly_investment_amount: null },
