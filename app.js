@@ -184,11 +184,21 @@
       // Auto-transfer binds to the SAVINGS ACCOUNT only — SSBs are bought
       // in manual monthly issues, so they are the optional final step,
       // never the auto-transfer destination.
+      // L1-A3 is an AUTO-MILESTONE: no buttons; its status derives from
+      // the live progress (savingsProgressPct >= 100 -> done). Manual
+      // status writes to it are refused in setActionStatus.
+      var a3 = act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6);
+      a3.auto = true;
+      a3.progressPct = isNum(d.savingsProgressPct) ? d.savingsProgressPct : 0;
+      a3.status = (a3.progressPct >= 100) ? "done" : "not_started";
+      a3.autoHint = "Completes automatically when your fund reaches " + fmtSGD(target6) + ".";
+      var a4 = act("L1-A4", "(Optional, once your buffer grows) Move a portion into Singapore Savings Bonds (SSBs) — government-guaranteed and exitable any month — to earn more while staying liquid.");
+      a4.optional = true;
       plan.actions = [
         act("L1-A1", "Open a high-yield savings account as your emergency-fund home."),
         act("L1-A2", "Set up an automatic " + fmtSGD(suggestedMonthly) + " transfer on payday into that savings account.", suggestedMonthly),
-        act("L1-A3", "Build your fund to " + fmtSGD(target6) + " (6 months of expenses) — about " + monthsToTarget + " months at this rate.", target6),
-        act("L1-A4", "(Optional, once your buffer grows) Move a portion into Singapore Savings Bonds (SSBs) — government-guaranteed and exitable any month — to earn more while staying liquid.")
+        a3,
+        a4
       ];
       return plan;
     }
@@ -231,6 +241,24 @@
       act("L4-D3", "Make a CPF top-up for tax relief and retirement compounding.")
     ];
     return plan;
+  }
+
+  // The user's CURRENT focus action: the first incomplete NON-OPTIONAL
+  // action (started or not); optional actions only once every
+  // non-optional action is done. Used by getCurrentAction() and the
+  // panel's "This week" hero, so both always agree.
+  function nextAction(p) {
+    if (!p || !p.ready || p.complete) return null;
+    var k, a;
+    for (k = 0; k < p.actions.length; k++) {
+      a = p.actions[k];
+      if (!a.optional && a.status !== "done") return a;
+    }
+    for (k = 0; k < p.actions.length; k++) {
+      a = p.actions[k];
+      if (a.optional && a.status !== "done") return a;
+    }
+    return null;
   }
 
   /* =================================================================
@@ -354,6 +382,32 @@
         p.actions[1].text.indexOf("savings account") !== -1 &&
         p.actions[1].text.indexOf("SSB") === -1 &&
         p.actions[3].text.indexOf("automatic") === -1);
+      // M-series: A3 auto-milestone + focus selection
+      (function () {
+        function st(savings, actions) {
+          var inputs = {
+            monthly_take_home_income: 2800, monthly_expenses: 1400,
+            current_savings: savings, monthly_insurance_premium: null,
+            dtpd_coverage_amount: null, critical_illness_coverage_amount: null,
+            monthly_investment_amount: null
+          };
+          return generatePlan({ inputs: inputs, derived: computeAll(inputs),
+                                currentLevel: 1, actions: actions || {} });
+        }
+        var p36 = st(3024, { "L1-A1": "done", "L1-A2": "done" }); // 3024/8400 = 36%
+        check("M1 A3 is an auto milestone, not done below 100%",
+          p36.actions[2].auto === true && p36.actions[2].status !== "done" &&
+          p36.actions[2].progressPct === 36);
+        var p100 = st(8399, {});                                  // rounds to 100%, shortfall $1
+        check("M2 A3 auto-done at 100% live progress",
+          p100.ready === true && p100.actions[2].status === "done");
+        var na36 = nextAction(p36);
+        check("M3 current action is A3 (never A4) while A3 incomplete",
+          na36 !== null && na36.id === "L1-A3" && na36.id !== "L1-A4");
+        var naAfter = nextAction(st(8399, { "L1-A1": "done", "L1-A2": "done" }));
+        check("M4 optional A4 becomes current only after all non-optional done",
+          naAfter !== null && naAfter.id === "L1-A4");
+      })();
       var pNull = generatePlan({ inputs: { monthly_take_home_income: null, monthly_expenses: null,
         current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
         critical_illness_coverage_amount: null, monthly_investment_amount: null },
@@ -820,9 +874,8 @@
     progress.hidden = false;
     progress.textContent = doneCount + " of " + plan.actions.length + " actions done";
 
-    // Next Best Action = the first not_started action
-    var nba = null;
-    plan.actions.some(function (a) { if (a.status === "not_started") { nba = a; return true; } return false; });
+    // Next Best Action = same selection getCurrentAction() uses
+    var nba = nextAction(plan);
     if (nba) {
       hero.hidden = false;
       q("hero-text").textContent = nba.text;
@@ -833,6 +886,7 @@
     plan.actions.forEach(function (a) {
       var li = document.createElement("li");
       li.className = "plan-task" + (a.status === "done" ? " is-done" : a.status === "started" ? " is-started" : "");
+      if (a.auto) li.className += " is-auto";
       var box = document.createElement("span");
       box.className = "plan-box";
       box.setAttribute("aria-hidden", "true");
@@ -840,9 +894,21 @@
       var text = document.createElement("span");
       text.className = "plan-text";
       text.textContent = a.text;
+      if (a.auto && a.status !== "done" && a.autoHint) {
+        var hint = document.createElement("span");
+        hint.className = "plan-gate-hint";
+        hint.textContent = a.autoHint;
+        text.appendChild(hint);
+      }
       var btns = document.createElement("span");
       btns.className = "plan-btns";
-      if (a.status === "not_started") {
+      if (a.auto) {
+        // auto milestone: NO buttons — status derives from live progress
+        btns.innerHTML = (a.status === "done")
+          ? '<span class="plan-lvl-tag">Done</span>'
+          : '<span class="plan-lvl-tag is-auto-tag">' +
+            (isNum(a.progressPct) ? a.progressPct + "% there" : "Auto") + '</span>';
+      } else if (a.status === "not_started") {
         btns.innerHTML = '<button class="btn btn-ghost btn-xs" type="button" data-plan-set="started" data-id="' + a.id + '">Mark started</button>' +
                          '<button class="btn btn-accent btn-xs" type="button" data-plan-set="done" data-id="' + a.id + '">Mark done</button>';
       } else if (a.status === "started") {
@@ -871,6 +937,15 @@
 
   function setActionStatus(id, status) {
     if (ACTION_STATUSES.indexOf(status) === -1) return;
+    // Handler-level gate re-check: auto milestones derive their status
+    // from live progress — a stale-DOM tap can never set them manually.
+    var current = generatePlan(state);
+    for (var k = 0; k < current.actions.length; k++) {
+      if (current.actions[k].id === id && current.actions[k].auto) {
+        renderPlan(); // refresh any stale buttons
+        return;
+      }
+    }
     state.actions[id] = status;
     state.lastUpdated = new Date().toISOString();
     saveState();
@@ -990,17 +1065,14 @@
      next action ("Did you set up the $300 transfer?"). Read-only;
      no n8n changes live in this repo.
      ================================================================= */
-  // The current NOT_STARTED action for the current level, or null if
-  // the level's checklist is done (or no plan can be generated yet).
+  // The current FOCUS action for the current level: first incomplete
+  // non-optional action (auto milestones like L1-A3 count until their
+  // derived status is done); optional actions (L1-A4) are excluded
+  // until every non-optional action is complete. Null when the level's
+  // checklist is done or no plan can be generated yet.
   window.MFC.getCurrentAction = function () {
-    var p = generatePlan(state);
-    if (!p.ready || p.complete) return null;
-    for (var k = 0; k < p.actions.length; k++) {
-      if (p.actions[k].status === "not_started") {
-        return { id: p.actions[k].id, text: p.actions[k].text, amount: p.actions[k].amount };
-      }
-    }
-    return null;
+    var a = nextAction(generatePlan(state));
+    return a ? { id: a.id, text: a.text, amount: a.amount } : null;
   };
   // The full current-level action array (id/text/level/status/amount).
   window.MFC.getPlan = function () {

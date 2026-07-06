@@ -1343,6 +1343,13 @@ section[id] {
 }
 .plan-lvl.is-done .plan-lvl-tag { background: var(--brand); color: #fff; }
 .is-started-tag { background: rgba(232, 168, 60, 0.2); color: #8A5E14; margin-left: 0; }
+.is-auto-tag { background: var(--brand-tint); color: var(--brand-deep); margin-left: 0; }
+.plan-gate-hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.78rem;
+  color: var(--ink-soft);
+}
 
 /* "Enter my numbers" fallback panel (Ryan spec §5) */
 .entry-panel {
