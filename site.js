@@ -310,25 +310,6 @@
       }
     }
 
-    function levelUp() {
-      if (state.allComplete) return;
-      var completed = state.currentLevel;
-      // fill the ring to 100% first, then advance
-      var ring = get("ring");
-      if (ring) ring.style.strokeDashoffset = "0";
-      setText("pct", "100%");
-      setTimeout(function () {
-        if (state.currentLevel < levels.length) {
-          state.currentLevel += 1;
-        } else {
-          state.allComplete = true;
-        }
-        state.levelOverride = null; // demo derives states from currentLevel
-        render();
-        celebrate(completed);
-      }, 450);
-    }
-
     function reveal() {
       section.hidden = false;
       render();
@@ -453,14 +434,8 @@
       if (typeof data.celebrateLevel === "number") celebrate(data.celebrateLevel);
     }
 
-    return { reveal: reveal, update: update, levelUp: levelUp, init: init };
+    return { reveal: reveal, update: update, init: init };
   })();
-
-  // Wire the "Preview a level-up" demo button
-  var levelUpBtn = document.querySelector("[data-levelup]");
-  if (levelUpBtn && dashboard) {
-    levelUpBtn.addEventListener("click", function () { dashboard.levelUp(); });
-  }
 
   // Extend the public mount point for Ryan's app.js
   window.MFC.revealDashboard = function () {

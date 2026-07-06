@@ -1096,7 +1096,6 @@ section[id] {
   color: var(--brand);
   margin-bottom: 0.15rem;
 }
-.dash-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
 /* emergency-fund tracker bar (focus card, visible after L1 unlocks) */
 .dash-fundbar { margin-bottom: 1.2rem; }
