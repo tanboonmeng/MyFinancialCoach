@@ -236,6 +236,7 @@
         setText("detail", "You've completed all four levels — brilliant work.");
         setText("next", "Keep your weekly check-ins going.");
         setText("pct", "100%");
+        setText("ring-cap", "of target");
         var ringDone = get("ring");
         if (ringDone) ringDone.style.strokeDashoffset = "0";
       } else {
@@ -248,6 +249,8 @@
         // pct null = no data for this level yet: show "—", empty ring
         var hasPct = typeof lvl.pct === "number";
         setText("pct", hasPct ? lvl.pct + "%" : "—");
+        // caption follows the level's dial ("of cover target" at L2 etc.)
+        setText("ring-cap", lvl.ringCaption || "of target");
         var ring = get("ring");
         if (ring) ring.style.strokeDashoffset = hasPct
           ? (CIRCUMFERENCE * (1 - lvl.pct / 100)).toFixed(1)
@@ -419,6 +422,7 @@
           }
           if (data.focus.detail) active.detail = data.focus.detail;
           if (data.focus.next) active.next = data.focus.next;
+          active.ringCaption = data.focus.ringCaption || null;
         }
         if (data.savings || data.focus) {
           // Real numbers are in: relabel the sub line (streak stays sample).

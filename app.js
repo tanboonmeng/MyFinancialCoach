@@ -479,6 +479,18 @@
         critical_illness_coverage_amount: 50000, monthly_investment_amount: null };
       check("F5 L2 focus pct numeric once both covers entered",
         focusFor(2, withCover, computeAll(withCover)).pct === 33);
+      // Option-1 relabel: dial full but checklist open -> item-count next-step
+      var fullCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
+        current_savings: 5000, monthly_insurance_premium: 400, dtpd_coverage_amount: 302400,
+        critical_illness_coverage_amount: 134400, monthly_investment_amount: null };
+      var f100 = focusFor(2, fullCover, computeAll(fullCover), {});
+      check("F6 cover dial 100% + items open -> caption + checklist next-step",
+        f100.pct === 100 && f100.ringCaption === "of cover target" &&
+        f100.next === "Cover targets reached — 5 checklist items left to complete this level.");
+      var f100b = focusFor(2, fullCover, computeAll(fullCover),
+        { "L2-B1L": "done", "L2-B2": "done", "L2-B3": "done", "L2-B4L": "done" });
+      check("F7 remaining count reflects statuses (1 item left)",
+        f100b.next === "Cover targets reached — 1 checklist item left to complete this level.");
     })();
     console.log(pass
       ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
@@ -571,10 +583,18 @@
      ================================================================= */
   // Focus-card content for levels 2-4 (level 1 renders from savings{}).
   // Derivation + formatting live here; site.js only displays the strings.
-  function focusFor(level, inputs, d) {
+  // statuses (optional): the persisted action-status map — used to count
+  // remaining checklist items when the money dial reaches 100%, so
+  // completion language only ever comes from the checklist.
+  function focusFor(level, inputs, d, statuses) {
+    function itemsLeft(n) {
+      return buildLevel(n, { inputs: inputs, derived: d, actions: statuses || {} })
+        .actions.filter(function (a) { return a.status !== "done"; }).length;
+    }
     if (level === 2) {
       if (!isNum(d.dtpdTarget)) {
-        return { pct: 0, detail: "Add your income so your coach can size your cover targets.",
+        return { pct: 0, ringCaption: "of cover target",
+                 detail: "Add your income so your coach can size your cover targets.",
                  next: "Your Death & TPD and CI targets come from 9x / 4x annual income." };
       }
       var c1 = inputs.dtpd_coverage_amount, c2 = inputs.critical_illness_coverage_amount;
@@ -585,8 +605,11 @@
         : null;
       var detail = "Death & TPD " + (isNum(c1) ? fmtSGD(c1) : "—") + " of " + fmtSGD(d.dtpdTarget) +
                    " · CI " + (isNum(c2) ? fmtSGD(c2) : "—") + " of " + fmtSGD(d.ciTarget);
-      var next;
-      if (d.coverageCapConflict === true) {
+      var next, left2 = itemsLeft(2);
+      if (pct === 100 && left2 > 0) {
+        // money dial full but the level completes on ITEMS, not amounts
+        next = "Cover targets reached — " + left2 + " checklist item" + (left2 === 1 ? "" : "s") + " left to complete this level.";
+      } else if (d.coverageCapConflict === true) {
         next = "Full cover may exceed the 15% guideline — ask your coach.";
       } else if (d.premiumOk === false) {
         next = "Your premium is above the 15% guideline — worth a chat with your coach.";
@@ -595,20 +618,26 @@
       } else {
         next = "Grow your cover toward the MAS targets — premium is within the cap.";
       }
-      return { pct: pct, detail: detail, next: next };
+      return { pct: pct, ringCaption: "of cover target", detail: detail, next: next };
     }
     if (level === 3) {
       if (!isNum(d.investMinMonthly)) {
-        return { pct: 0, detail: "Add your income to set your 10% investing floor.",
+        return { pct: 0, ringCaption: "of invest target",
+                 detail: "Add your income to set your 10% investing floor.",
                  next: "MAS guidance: invest at least 10% of take-home pay." };
       }
       var inv = inputs.monthly_investment_amount;
+      var pct3 = isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : null;
+      var left3 = itemsLeft(3);
       return {
-        pct: isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : null,
+        pct: pct3,
+        ringCaption: "of invest target",
         detail: isNum(inv)
           ? fmtSGD(inv) + " of " + fmtSGD(d.investMinMonthly) + " monthly investing target"
           : "Target " + fmtSGD(d.investMinMonthly) + "/month — add your investing amount.",
-        next: "Invest at least 10% of take-home pay, now that you're protected."
+        next: (pct3 === 100 && left3 > 0)
+          ? "Investing target reached — " + left3 + " checklist item" + (left3 === 1 ? "" : "s") + " left to complete this level."
+          : "Invest at least 10% of take-home pay, now that you're protected."
       };
     }
     if (level === 4) {
@@ -794,7 +823,7 @@
       // everything done: lets the dashboard render its all-complete state
       allComplete: state.currentLevel === 4 && levelComplete(4, state)
     };
-    var focus = focusFor(state.currentLevel, state.inputs, d);
+    var focus = focusFor(state.currentLevel, state.inputs, d, state.actions);
     if (focus) payload.focus = focus;
     if (isNum(celebrateLevel)) payload.celebrateLevel = celebrateLevel;
     window.MFC.updateDashboard(payload);
@@ -1068,6 +1097,8 @@
       if (!allBefore && allAfter) {
         pushDashboard(4);            // toast reads "All four levels complete!"
         console.log("[app.js] level 4 complete — all levels done");
+      } else {
+        pushDashboard();             // keep focus-card copy (e.g. items-left count) live
       }
       pushBotpressVars("plan");      // keep the coach's variables fresh
     }
