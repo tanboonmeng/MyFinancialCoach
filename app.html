@@ -144,6 +144,32 @@
           </div>
 
           <!-- =====================================================
+               YOUR ACTION PLAN (Plan -> Do -> Check) — deterministic
+               checklist rendered by app.js from generatePlan(state).
+               Current level = active checklist; completed levels
+               collapse to Done rows; future levels show locked.
+               ===================================================== -->
+          <div class="plan-panel" id="planPanel">
+            <div class="plan-head">
+              <h3 class="plan-title">Your action plan</h3>
+              <span class="plan-progress" data-plan="progress" hidden></span>
+            </div>
+
+            <ul class="plan-context" data-plan="done-strip"></ul>
+
+            <div data-plan="active">
+              <p class="plan-hero" data-plan="hero" hidden>
+                <span class="plan-hero-label">This week</span>
+                <span data-plan="hero-text"></span>
+              </p>
+              <ol class="plan-list" data-plan="list"></ol>
+              <p class="plan-empty" data-plan="empty" hidden></p>
+            </div>
+
+            <ul class="plan-context" data-plan="locked-strip"></ul>
+          </div>
+
+          <!-- =====================================================
                "ENTER MY NUMBERS" — demo-safe fallback (Ryan spec §5).
                Two doors, one pipeline: this form and the coach chat
                both feed window.MFC.ingestExtraction (Contract 2).

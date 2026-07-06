@@ -373,9 +373,12 @@
     inputs: {},          // the 7 raw fields, null until provided
     derived: {},         // computeAll() output
     currentLevel: 1,     // gatekeeping arrives in Phase 3
+    actions: {},         // action-plan statuses: id -> not_started|started|done
     lastUpdated: null
   };
   FIELDS.forEach(function (k) { state.inputs[k] = null; });
+
+  var ACTION_STATUSES = ["not_started", "started", "done"];
 
   function hasAnyInput() {
     return FIELDS.some(function (k) { return state.inputs[k] !== null; });
@@ -388,6 +391,7 @@
         inputs: state.inputs,
         derived: state.derived,
         currentLevel: state.currentLevel,
+        actions: state.actions,
         lastUpdated: state.lastUpdated
       }));
     } catch (e) { /* private mode / quota — state stays in memory */ }
@@ -411,6 +415,13 @@
     });
     if (isNum(saved.currentLevel) && saved.currentLevel >= 1 && saved.currentLevel <= 4) {
       state.currentLevel = Math.round(saved.currentLevel);
+    }
+    if (saved.actions && typeof saved.actions === "object") {
+      Object.keys(saved.actions).forEach(function (id) {
+        if (ACTION_STATUSES.indexOf(saved.actions[id]) !== -1) {
+          state.actions[id] = saved.actions[id];
+        }
+      });
     }
     if (typeof saved.lastUpdated === "string") state.lastUpdated = saved.lastUpdated;
   }
@@ -644,6 +655,7 @@
     pushDashboard(leveledUp ? next - 1 : undefined);
     pushBotpressVars("recalc"); // Contract 3: after every recalculation
     if (leveledUp) pushLevelSync(next); // Contract 4 (no-op while flag OFF)
+    renderPlan(); // plan amounts/level follow the numbers deterministically
     console.log("[app.js] recomputed:", JSON.parse(JSON.stringify({
       inputs: state.inputs, derived: state.derived,
       currentLevel: state.currentLevel, leveledUp: leveledUp
@@ -736,6 +748,134 @@
      (read-only surface; not part of the team contracts).
      ================================================================= */
   /* =================================================================
+     ACTION PLAN PANEL (Phase 2 UI) — renders generatePlan(state) into
+     #planPanel. Current level = active checklist; earlier levels
+     collapse to Done rows; later levels show locked previews.
+     Status changes persist to mfc_state_v1; completing every action
+     of the current level advances the level and fires the existing
+     celebration toast (via pushDashboard's celebrateLevel).
+     ================================================================= */
+  var PLAN_TITLES = {
+    1: "Emergency fund & money management",
+    2: "Insurance protection",
+    3: "Investing",
+    4: "Home & retirement"
+  };
+  var CHECK_PATH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+
+  function renderPlan() {
+    var panel = document.getElementById("planPanel");
+    if (!panel) return;
+    var q = function (k) { return panel.querySelector('[data-plan="' + k + '"]'); };
+    var plan = generatePlan(state);
+    var cur = state.currentLevel;
+
+    // Done strip (completed levels) + locked strip (future levels)
+    var doneHtml = "", lockedHtml = "";
+    for (var n = 1; n <= 4; n++) {
+      if (n < cur) {
+        doneHtml += '<li class="plan-lvl is-done"><span class="plan-lvl-check">' + CHECK_PATH +
+                    '</span>Level ' + n + " · " + PLAN_TITLES[n] + '<span class="plan-lvl-tag">Done</span></li>';
+      } else if (n > cur) {
+        lockedHtml += '<li class="plan-lvl is-locked">Level ' + n + " · " + PLAN_TITLES[n] +
+                      '<span class="plan-lvl-tag">Locked</span></li>';
+      }
+    }
+    q("done-strip").innerHTML = doneHtml;
+    q("locked-strip").innerHTML = lockedHtml;
+
+    var list = q("list"), hero = q("hero"), empty = q("empty"), progress = q("progress");
+    list.innerHTML = "";
+
+    if (!plan.ready) {
+      hero.hidden = true; progress.hidden = true;
+      empty.hidden = false;
+      empty.textContent = plan.reason || "Enter your numbers to generate your plan.";
+      return;
+    }
+    if (plan.complete || plan.actions.length === 0) {
+      hero.hidden = true; progress.hidden = true;
+      empty.hidden = false;
+      empty.textContent = "Level " + plan.level + " complete — nice work.";
+      return;
+    }
+
+    empty.hidden = true;
+    var doneCount = plan.actions.filter(function (a) { return a.status === "done"; }).length;
+    progress.hidden = false;
+    progress.textContent = doneCount + " of " + plan.actions.length + " actions done";
+
+    // Next Best Action = the first not_started action
+    var nba = null;
+    plan.actions.some(function (a) { if (a.status === "not_started") { nba = a; return true; } return false; });
+    if (nba) {
+      hero.hidden = false;
+      q("hero-text").textContent = nba.text;
+    } else {
+      hero.hidden = true;
+    }
+
+    plan.actions.forEach(function (a) {
+      var li = document.createElement("li");
+      li.className = "plan-task" + (a.status === "done" ? " is-done" : a.status === "started" ? " is-started" : "");
+      var box = document.createElement("span");
+      box.className = "plan-box";
+      box.setAttribute("aria-hidden", "true");
+      if (a.status === "done") box.innerHTML = CHECK_PATH;
+      var text = document.createElement("span");
+      text.className = "plan-text";
+      text.textContent = a.text;
+      var btns = document.createElement("span");
+      btns.className = "plan-btns";
+      if (a.status === "not_started") {
+        btns.innerHTML = '<button class="btn btn-ghost btn-xs" type="button" data-plan-set="started" data-id="' + a.id + '">Mark started</button>' +
+                         '<button class="btn btn-accent btn-xs" type="button" data-plan-set="done" data-id="' + a.id + '">Mark done</button>';
+      } else if (a.status === "started") {
+        btns.innerHTML = '<span class="plan-lvl-tag is-started-tag">Started</span>' +
+                         '<button class="btn btn-accent btn-xs" type="button" data-plan-set="done" data-id="' + a.id + '">Mark done</button>';
+      } else {
+        btns.innerHTML = '<span class="plan-lvl-tag">Done</span>';
+      }
+      li.appendChild(box); li.appendChild(text); li.appendChild(btns);
+      list.appendChild(li);
+    });
+  }
+
+  function completeLevelViaPlan() {
+    var completed = state.currentLevel;
+    if (state.currentLevel < 4) state.currentLevel += 1; // forward-only
+    state.lastUpdated = new Date().toISOString();
+    saveState();
+    pushDashboard(completed);        // re-renders cards + existing toast
+    pushBotpressVars("plan");
+    if (state.currentLevel > completed) pushLevelSync(state.currentLevel);
+    renderPlan();
+    console.log("[app.js] plan complete — level " + completed + " done" +
+      (state.currentLevel > completed ? ", advanced to " + state.currentLevel : ""));
+  }
+
+  function setActionStatus(id, status) {
+    if (ACTION_STATUSES.indexOf(status) === -1) return;
+    state.actions[id] = status;
+    state.lastUpdated = new Date().toISOString();
+    saveState();
+    var plan = generatePlan(state);
+    var allDone = plan.ready && plan.actions.length > 0 &&
+      plan.actions.every(function (a) { return a.status === "done"; });
+    if (allDone) { completeLevelViaPlan(); return; }
+    renderPlan();
+  }
+
+  (function wirePlanPanel() {
+    var panel = document.getElementById("planPanel");
+    if (!panel) return;
+    panel.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-plan-set]");
+      if (btn) setActionStatus(btn.dataset.id, btn.dataset.planSet);
+    });
+  })();
+
+  /* =================================================================
      RESET MY DATA — clears saved numbers/progress and returns the
      dashboard to a clean Level-1 view. Confirm dialog is accessible
      (focus management, Escape, focus trap, ARIA on the markup).
@@ -745,6 +885,7 @@
     FIELDS.forEach(function (k) { state.inputs[k] = null; });
     state.derived = computeAll(state.inputs); // all-null in -> null out, never NaN
     state.currentLevel = 1;
+    state.actions = {};                       // action plan back to not_started
     state.lastUpdated = null;
 
     var ef = document.getElementById("entryForm");
@@ -758,6 +899,7 @@
     }
     // Keep the coach's variables in sync with the cleared state.
     pushBotpressVars("reset");
+    renderPlan(); // back to "enter your numbers" with all statuses cleared
     console.log("[app.js] data reset — cleared numbers, dashboard back to Level 1.");
   }
   window.MFC.resetData = resetData;
@@ -841,7 +983,9 @@
 
   loadState();
   if (hasAnyInput()) {
-    recompute(); // derives, persists, and pushes the restored numbers
+    recompute(); // derives, persists, pushes AND re-renders the plan
+  } else {
+    renderPlan(); // empty state: "enter your numbers to generate your plan"
   }
 
 })();
