@@ -317,6 +317,31 @@
     //    levels:[{id, state}] }). Rendering-only extension.
     function update(data) {
       if (!data) return;
+
+      // Reset-my-data: clean Level-1 view (empty ring, cleared targets,
+      // L2-L4 locked) + a confirmation toast. No NaN, no computed figures.
+      if (data.reset === true) {
+        state.currentLevel = 1;
+        state.allComplete = false;
+        state.levelOverride = null;
+        var l1 = levels[0];
+        l1.pct = 0;
+        l1.detail = "Enter your numbers below to see your emergency-fund progress.";
+        l1.next = "Start with Level 1 — build your emergency fund.";
+        setText("streak", 0);
+        var subEl = section.querySelector(".dash-sub");
+        if (subEl) subEl.innerHTML = "Fresh start for <code>user1</code> — enter your numbers below to see live progress.";
+        if (!section.hidden) render();
+        var rt = get("toast");
+        if (rt) {
+          setText("toast-text", "Your data has been cleared — starting fresh.");
+          rt.hidden = false;
+          clearTimeout(rt._timer);
+          rt._timer = setTimeout(function () { rt.hidden = true; }, 2600);
+        }
+        return;
+      }
+
       if (typeof data.currentLevel === "number") {
         state.currentLevel = Math.min(Math.max(data.currentLevel, 1), levels.length);
         state.allComplete = false;

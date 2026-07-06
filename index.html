@@ -45,7 +45,7 @@
         <a href="#journey" class="nav-link">The journey</a>
         <a href="#coach" class="nav-link">Coach chat</a>
         <a href="#how" class="nav-link">How it works</a>
-        <a href="#onboarding" class="btn btn-accent btn-sm">Start your journey</a>
+        <a href="app.html" class="btn btn-accent btn-sm">Open my workspace</a>
       </div>
     </nav>
   </header>
@@ -63,7 +63,7 @@
           <h1 class="hero-title">Your first paycheck to your first home — <span class="hero-highlight">one level at a time</span></h1>
           <p class="hero-sub">A friendly coach that turns official MAS financial planning benchmarks into a simple four-level path. Chat naturally, get your targets, and let Telegram keep you on track.</p>
           <div class="hero-actions">
-            <a href="#onboarding" class="btn btn-accent">Start your journey</a>
+            <a href="app.html" class="btn btn-accent">Open my workspace</a>
             <a href="#journey" class="btn btn-ghost">See the four levels</a>
           </div>
           <p class="hero-note">Grounded in the MAS Basic Financial Planning Guide · Built by Team Alpha Minds</p>
@@ -291,7 +291,7 @@
 
           <ol class="onboard-steps">
             <li class="step-dot is-active" data-dot="1"><span class="step-dot-num">1</span><span class="step-dot-label">Welcome</span></li>
-            <li class="step-dot" data-dot="2"><span class="step-dot-num">2</span><span class="step-dot-label">Connect Telegram</span></li>
+            <li class="step-dot" data-dot="2"><span class="step-dot-num">2</span><span class="step-dot-label">Set up nudges</span></li>
             <li class="step-dot" data-dot="3"><span class="step-dot-num">3</span><span class="step-dot-label">Start coaching</span></li>
           </ol>
 
@@ -300,27 +300,27 @@
             <!-- Step 1 — Welcome -->
             <div class="onboard-panel" data-step="1">
               <h3 class="step-heading" tabindex="-1">Let's set up your financial coach.</h3>
-              <p class="step-copy">It takes about a minute. You'll connect Telegram so your coach can check in on you each week, then jump straight into your first level.</p>
-              <p class="onboard-note">Demo profile: <code>user1</code> — no login needed for this single-user build.</p>
+              <p class="step-copy">It takes about a minute. You'll set up your own Telegram nudges so your coach can check in on you each week, then jump straight into your first level.</p>
               <button class="btn btn-accent" type="button" data-goto="2">Let's go</button>
             </div>
 
-            <!-- Step 2 — Connect Telegram (the critical step) -->
+            <!-- Step 2 — Set up your own nudges (self-hosted bot) -->
             <div class="onboard-panel" data-step="2" hidden>
-              <h3 class="step-heading" tabindex="-1">Connect Telegram</h3>
-              <p class="step-copy">Tap to open Telegram. This lets your coach send you weekly check-ins even when this tab is closed.</p>
+              <h3 class="step-heading" tabindex="-1">Set up your own nudges</h3>
+              <p class="step-copy">Weekly check-ins come from a Telegram bot that <strong>you</strong> own and control. Creating one takes a few minutes:</p>
 
-              <!-- Live bot from Rainie (Contract 5): @alphaminds_c240_bot. The ?start=user1 payload fires Workflow A's onboarding branch. -->
-              <a class="btn btn-telegram" href="https://t.me/alphaminds_c240_bot?start=user1" target="_blank" rel="noopener">
-                <svg class="tg-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
-                Connect Telegram
-              </a>
+              <ol class="setup-steps">
+                <li><strong>Create your bot.</strong> Message <code>@BotFather</code> on Telegram, send <code>/newbot</code>, follow the prompts, and copy your bot token.</li>
+                <li><strong>Add the token.</strong> Paste it into your n8n Telegram credential (or your Python scheduler config).</li>
+                <li><strong>Register yourself.</strong> Open a chat with your new bot and send <code>/start</code>.</li>
+                <li><strong>You're set.</strong> Your weekly nudges now come from your own bot.</li>
+              </ol>
 
-              <p class="onboard-note">Opens Telegram and sends <code>/start user1</code> to your coach. Your chat is captured securely on the server, not in this browser.</p>
+              <p class="onboard-note">Your bot, your token, your data — nothing runs through anyone else's account.</p>
 
               <div class="onboard-actions">
                 <button class="btn btn-ghost btn-sm" type="button" data-goto="1">Back</button>
-                <button class="btn btn-accent btn-sm" type="button" data-goto="3">I've connected</button>
+                <button class="btn btn-accent btn-sm" type="button" data-goto="3">Continue</button>
               </div>
             </div>
 

@@ -1248,6 +1248,86 @@ section[id] {
   font-weight: 600;
 }
 
+/* Self-setup nudges guide (onboarding step 2) */
+.setup-steps {
+  list-style: decimal;
+  padding-left: 1.4rem;
+  margin: 0.4rem 0 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: 56ch;
+}
+.setup-steps li {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  padding-left: 0.25rem;
+}
+.setup-steps li strong { color: var(--ink); }
+.setup-steps code {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  background: var(--brand-tint);
+  color: var(--brand-deep);
+  padding: 0.05rem 0.4rem;
+  border-radius: 4px;
+}
+
+/* Workspace settings row + Reset-my-data dialog */
+.workspace-settings {
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mfc-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+}
+.mfc-modal[hidden] { display: none; }
+.mfc-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 51, 46, 0.45);
+}
+.mfc-modal-card {
+  position: relative;
+  z-index: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 24px 60px rgba(10, 87, 72, 0.28);
+  padding: 1.6rem;
+  width: min(100%, 26rem);
+  animation: dash-pop 240ms ease;
+}
+.mfc-modal-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+}
+.mfc-modal-text {
+  color: var(--ink-soft);
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 1.4rem;
+}
+.mfc-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 /* level-up celebration */
 @keyframes dash-pop {
   0% { transform: scale(0.9); opacity: 0; }

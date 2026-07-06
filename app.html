@@ -4,20 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Access gate: the workspace is only reachable after onboarding.
-       If the "unlocked" flag isn't set (set by site.js on "Start coaching",
-       or by the testing "Send" shortcut), send the visitor to onboarding.
-       Runs before render so the page never flashes for a gated visitor. -->
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem("mfc_onboarded") !== "1") {
-          location.replace("index.html#onboarding");
-        }
-      } catch (e) { /* if storage is blocked, allow through */ }
-    })();
-  </script>
-
   <title>My Financial Coach — your workspace</title>
   <meta name="description" content="Your progress dashboard and coach chat. My Financial Coach by Team Alpha Minds." />
 
@@ -221,8 +207,26 @@
         </aside>
 
       </div>
+
+      <!-- Workspace settings row -->
+      <div class="workspace-settings">
+        <button class="btn btn-ghost btn-sm" type="button" id="resetDataBtn">Reset my data</button>
+      </div>
     </div>
   </main>
+
+  <!-- Reset confirmation dialog (wired in app.js) -->
+  <div class="mfc-modal" id="resetModal" hidden>
+    <div class="mfc-modal-backdrop" id="resetBackdrop"></div>
+    <div class="mfc-modal-card" role="dialog" aria-modal="true" aria-labelledby="resetTitle" aria-describedby="resetDesc">
+      <h2 class="mfc-modal-title" id="resetTitle">Reset my data</h2>
+      <p class="mfc-modal-text" id="resetDesc">This will clear all your saved numbers and progress and start you fresh. Continue?</p>
+      <div class="mfc-modal-actions">
+        <button class="btn btn-ghost btn-sm" type="button" id="resetCancel">Cancel</button>
+        <button class="btn btn-accent btn-sm" type="button" id="resetConfirm">Yes, reset</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ============================================================
        LIVE BOTPRESS WEBCHAT — embedded INLINE in #mfc-webchat.

@@ -627,6 +627,69 @@
      Expose the pure functions for Ezann's C-series testing in DevTools
      (read-only surface; not part of the team contracts).
      ================================================================= */
+  /* =================================================================
+     RESET MY DATA — clears saved numbers/progress and returns the
+     dashboard to a clean Level-1 view. Confirm dialog is accessible
+     (focus management, Escape, focus trap, ARIA on the markup).
+     ================================================================= */
+  function resetData() {
+    try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+    FIELDS.forEach(function (k) { state.inputs[k] = null; });
+    state.derived = computeAll(state.inputs); // all-null in -> null out, never NaN
+    state.currentLevel = 1;
+    state.lastUpdated = null;
+
+    var ef = document.getElementById("entryForm");
+    if (ef) ef.reset();
+    var es = document.getElementById("entryStatus");
+    if (es) { es.hidden = true; es.textContent = ""; }
+
+    // Clean Level-1 render + toast (site.js handles the reset flag).
+    if (window.MFC && typeof window.MFC.updateDashboard === "function") {
+      window.MFC.updateDashboard({ reset: true });
+    }
+    // Keep the coach's variables in sync with the cleared state.
+    pushBotpressVars("reset");
+    console.log("[app.js] data reset — cleared numbers, dashboard back to Level 1.");
+  }
+  window.MFC.resetData = resetData;
+
+  (function wireResetDialog() {
+    var trigger = document.getElementById("resetDataBtn");
+    var modal = document.getElementById("resetModal");
+    if (!trigger || !modal) return;
+    var cancelBtn = document.getElementById("resetCancel");
+    var confirmBtn = document.getElementById("resetConfirm");
+    var backdrop = document.getElementById("resetBackdrop");
+    var lastFocused = null;
+
+    function onKeydown(e) {
+      if (e.key === "Escape") { e.preventDefault(); closeModal(); return; }
+      if (e.key === "Tab") {                       // trap focus in the dialog
+        var order = [cancelBtn, confirmBtn];
+        var i = order.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); confirmBtn.focus(); }
+        else if (!e.shiftKey && i === order.length - 1) { e.preventDefault(); cancelBtn.focus(); }
+      }
+    }
+    function openModal() {
+      lastFocused = document.activeElement;
+      modal.hidden = false;
+      document.addEventListener("keydown", onKeydown, true);
+      cancelBtn.focus(); // safe default for a destructive action
+    }
+    function closeModal() {
+      modal.hidden = true;
+      document.removeEventListener("keydown", onKeydown, true);
+      if (lastFocused && typeof lastFocused.focus === "function") lastFocused.focus();
+    }
+
+    trigger.addEventListener("click", openModal);
+    cancelBtn.addEventListener("click", closeModal);
+    if (backdrop) backdrop.addEventListener("click", closeModal);
+    confirmBtn.addEventListener("click", function () { resetData(); closeModal(); });
+  })();
+
   window.MFC.calc = {
     emergencyTargetMin: emergencyTargetMin,
     emergencyTargetFull: emergencyTargetFull,
