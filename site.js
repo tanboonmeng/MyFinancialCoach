@@ -236,7 +236,7 @@
         setText("detail", "You've completed all four levels — brilliant work.");
         setText("next", "Keep your weekly check-ins going.");
         setText("pct", "100%");
-        setText("ring-cap", "of target");
+        setText("ring-cap", "level complete");
         var ringDone = get("ring");
         if (ringDone) ringDone.style.strokeDashoffset = "0";
       } else {

@@ -221,6 +221,16 @@
            lv.actions.every(function (a) { return a.status === "done"; });
   }
 
+  // Checklist completion for the ring (team ruling 2026-07-06): the dial
+  // shows items done / items total — 100% means the level is closed.
+  function levelItemsPct(n, st) {
+    var lv = buildLevel(n, st);
+    if (!lv.ready || lv.actions.length === 0) return { done: 0, total: 0, pct: null };
+    var done = lv.actions.filter(function (a) { return a.status === "done"; }).length;
+    return { done: done, total: lv.actions.length,
+             pct: Math.round(100 * done / lv.actions.length) };
+  }
+
   // currentLevel = the first incomplete level; 4 is the final home.
   function deriveCurrentLevel(st) {
     if (!levelComplete(1, st)) return 1;
@@ -472,25 +482,39 @@
       check("F3 fund note null-safe on missing inputs",
         fundProgressNote(dNull, 2) === null);
       var noCover = in5000;
-      check("F4 L2 focus pct is null with no cover data",
-        focusFor(2, noCover, computeAll(noCover)).pct === null);
+      check("F4 L2 money-pct is null with no cover data",
+        focusFor(2, noCover, computeAll(noCover)).moneyPct === null);
       var withCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
         current_savings: 5000, monthly_insurance_premium: null, dtpd_coverage_amount: 100000,
         critical_illness_coverage_amount: 50000, monthly_investment_amount: null };
-      check("F5 L2 focus pct numeric once both covers entered",
-        focusFor(2, withCover, computeAll(withCover)).pct === 33);
-      // Option-1 relabel: dial full but checklist open -> item-count next-step
+      check("F5 L2 money-pct numeric once both covers entered",
+        focusFor(2, withCover, computeAll(withCover)).moneyPct === 33);
+      // Cover targets reached but checklist open -> item-count next-step
       var fullCover = { monthly_take_home_income: 2800, monthly_expenses: 1400,
         current_savings: 5000, monthly_insurance_premium: 400, dtpd_coverage_amount: 302400,
         critical_illness_coverage_amount: 134400, monthly_investment_amount: null };
       var f100 = focusFor(2, fullCover, computeAll(fullCover), {});
-      check("F6 cover dial 100% + items open -> caption + checklist next-step",
-        f100.pct === 100 && f100.ringCaption === "of cover target" &&
+      check("F6 cover money-pct 100% + items open -> checklist next-step",
+        f100.moneyPct === 100 &&
         f100.next === "Cover targets reached — 5 checklist items left to complete this level.");
       var f100b = focusFor(2, fullCover, computeAll(fullCover),
         { "L2-B1L": "done", "L2-B2": "done", "L2-B3": "done", "L2-B4L": "done" });
       check("F7 remaining count reflects statuses (1 item left)",
         f100b.next === "Cover targets reached — 1 checklist item left to complete this level.");
+      // RING = checklist completion (team ruling): 1 of 5 done -> 20%
+      var stR = { inputs: fullCover, derived: computeAll(fullCover),
+                  actions: { "L2-B1L": "done" } };
+      check("R1 ring pct is items-based: 1 of 5 L2 items done -> 20%",
+        levelItemsPct(2, stR).pct === 20 && levelItemsPct(2, stR).done === 1 &&
+        levelItemsPct(2, stR).total === 5);
+      var stR1 = { inputs: fullCover, derived: computeAll(fullCover), actions: {} };
+      check("R2 uniform at L1: only latched 1.3 done -> 20% (1 of 5)",
+        levelItemsPct(1, stR1).pct === 20); // savings 5000 >= 4200 auto-completes 1.3
+      check("R3 not-ready level -> pct null (ring em-dash)",
+        levelItemsPct(1, { inputs: { monthly_take_home_income: null, monthly_expenses: null,
+          current_savings: null, monthly_insurance_premium: null, dtpd_coverage_amount: null,
+          critical_illness_coverage_amount: null, monthly_investment_amount: null },
+          derived: null, actions: {} }).pct === null);
     })();
     console.log(pass
       ? "[app.js] self-tests: PASS (" + total + "/" + total + ")"
@@ -593,8 +617,7 @@
     }
     if (level === 2) {
       if (!isNum(d.dtpdTarget)) {
-        return { pct: 0, ringCaption: "of cover target",
-                 detail: "Add your income so your coach can size your cover targets.",
+        return { detail: "Add your income so your coach can size your cover targets.",
                  next: "Your Death & TPD and CI targets come from 9x / 4x annual income." };
       }
       var c1 = inputs.dtpd_coverage_amount, c2 = inputs.critical_illness_coverage_amount;
@@ -618,20 +641,19 @@
       } else {
         next = "Grow your cover toward the MAS targets — premium is within the cap.";
       }
-      return { pct: pct, ringCaption: "of cover target", detail: detail, next: next };
+      // moneyPct informational only (ring is items-based upstream)
+      return { moneyPct: pct, detail: detail, next: next };
     }
     if (level === 3) {
       if (!isNum(d.investMinMonthly)) {
-        return { pct: 0, ringCaption: "of invest target",
-                 detail: "Add your income to set your 10% investing floor.",
+        return { detail: "Add your income to set your 10% investing floor.",
                  next: "MAS guidance: invest at least 10% of take-home pay." };
       }
       var inv = inputs.monthly_investment_amount;
       var pct3 = isNum(inv) ? Math.min(100, Math.max(0, Math.round(100 * inv / d.investMinMonthly))) : null;
       var left3 = itemsLeft(3);
       return {
-        pct: pct3,
-        ringCaption: "of invest target",
+        moneyPct: pct3,
         detail: isNum(inv)
           ? fmtSGD(inv) + " of " + fmtSGD(d.investMinMonthly) + " monthly investing target"
           : "Target " + fmtSGD(d.investMinMonthly) + "/month — add your investing amount.",
@@ -823,8 +845,13 @@
       // everything done: lets the dashboard render its all-complete state
       allComplete: state.currentLevel === 4 && levelComplete(4, state)
     };
-    var focus = focusFor(state.currentLevel, state.inputs, d, state.actions);
-    if (focus) payload.focus = focus;
+    // Focus card: detail/next stay money-facts (from focusFor), but the
+    // RING is checklist completion — 100% only when the level is closed.
+    var focus = focusFor(state.currentLevel, state.inputs, d, state.actions) || {};
+    var ip = levelItemsPct(state.currentLevel, state);
+    focus.pct = ip.pct;                 // items done / total (null when not ready)
+    focus.ringCaption = "level complete";
+    payload.focus = focus;
     if (isNum(celebrateLevel)) payload.celebrateLevel = celebrateLevel;
     window.MFC.updateDashboard(payload);
   }
