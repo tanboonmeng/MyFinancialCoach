@@ -766,6 +766,9 @@ section[id] {
   transition: background-color 120ms ease;
 }
 .coach-send:hover { background: var(--brand-deep); }
+/* the preview's Send is intentionally inert — keep the mock's look */
+.coach-send:disabled { cursor: default; opacity: 1; }
+.coach-send:disabled:hover { background: var(--brand); }
 
 /* ---------- Onboarding flow ---------- */
 .onboard {

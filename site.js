@@ -131,15 +131,6 @@
     });
   }
 
-  /* ---------- Testing shortcut: the dummy "Send" opens the workspace ----- */
-  var openAppBtn = document.querySelector("[data-open-app]");
-  if (openAppBtn) {
-    openAppBtn.addEventListener("click", function () {
-      unlockWorkspace();
-      window.location.href = "app.html";
-    });
-  }
-
   /* ---------- Progress dashboard (presentation only) ---------- */
   // The website renders the VIEW; Ryan's app.js supplies the real numbers via
   // window.MFC.updateDashboard({ currentLevel, savingsProgress, streakWeeks, ... }).
