@@ -225,6 +225,33 @@
 
       </div>
 
+      <!-- =========================================================
+           CONNECT TELEGRAM (OPTIONAL) — opt-in for encouragement
+           nudges. UI only: app.js wires it to setCoachEventSettings;
+           events stay OFF until BOTH fields are filled. No token and
+           no Telegram host here — the bot secret lives in n8n.
+           ========================================================= -->
+      <div class="entry-panel" id="tgConnect">
+        <h3 class="entry-title">Connect Telegram (optional)</h3>
+        <p class="entry-sub">Paste your Telegram chat ID (from /start) and your n8n webhook URL to get a nudge as you complete each step. Leave blank to keep this off.</p>
+        <form id="tgConnectForm" novalidate>
+          <div class="entry-grid">
+            <label class="entry-field">
+              <span class="entry-label">Telegram chat ID</span>
+              <input type="text" id="tgChatId" name="tgChatId" inputmode="numeric" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. 123456789" />
+            </label>
+            <label class="entry-field">
+              <span class="entry-label">n8n webhook URL</span>
+              <input type="url" id="n8nWebhook" name="n8nWebhook" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="https://your-n8n-host/webhook/…" />
+            </label>
+          </div>
+          <div class="entry-actions">
+            <button class="btn btn-ghost btn-sm" type="submit">Save Telegram settings</button>
+            <p class="entry-status" id="tgConnectStatus" role="status" aria-live="polite">Off</p>
+          </div>
+        </form>
+      </div>
+
       <!-- Workspace settings row -->
       <div class="workspace-settings">
         <button class="btn btn-ghost btn-sm" type="button" id="resetDataBtn">Reset my data</button>

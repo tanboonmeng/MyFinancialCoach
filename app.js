@@ -1258,12 +1258,17 @@
     state.derived = computeAll(state.inputs); // all-null in -> null out, never NaN
     state.currentLevel = 1;
     state.actions = {};                       // action plan back to not_started
+    state.settings = { tgChatId: "", n8nWebhook: "" }; // Telegram opt-in back OFF
     state.lastUpdated = null;
 
     var ef = document.getElementById("entryForm");
     if (ef) ef.reset();
     var es = document.getElementById("entryStatus");
     if (es) { es.hidden = true; es.textContent = ""; }
+    var tf = document.getElementById("tgConnectForm");
+    if (tf) tf.reset();
+    var ts = document.getElementById("tgConnectStatus");
+    if (ts) { ts.textContent = "Off"; ts.className = "entry-status"; }
 
     // Clean Level-1 render + toast (site.js handles the reset flag).
     if (window.MFC && typeof window.MFC.updateDashboard === "function") {
@@ -1527,5 +1532,35 @@
   } else {
     renderPlan(); // empty state: "enter your numbers to generate your plan"
   }
+
+  /* =================================================================
+     CONNECT TELEGRAM (OPTIONAL) — settings UI wiring only. Reads and
+     writes go through window.MFC.setCoachEventSettings (the existing
+     save path); runs after loadState() so the pre-fill sees persisted
+     values. No plan-engine or completion logic here.
+     ================================================================= */
+  (function wireTelegramConnect() {
+    var form = document.getElementById("tgConnectForm");
+    var chatEl = document.getElementById("tgChatId");
+    var hookEl = document.getElementById("n8nWebhook");
+    var statusEl = document.getElementById("tgConnectStatus");
+    if (!form || !chatEl || !hookEl || !statusEl) return;
+
+    function renderTgStatus(s) {
+      var on = !!(s.tgChatId && s.n8nWebhook);
+      statusEl.textContent = on ? "Connected — you'll get encouragement messages" : "Off";
+      statusEl.className = "entry-status" + (on ? " is-ok" : "");
+    }
+
+    chatEl.value = state.settings.tgChatId;
+    hookEl.value = state.settings.n8nWebhook;
+    renderTgStatus(state.settings);
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      // setter trims, persists via saveState() and returns what stuck
+      renderTgStatus(window.MFC.setCoachEventSettings(chatEl.value, hookEl.value));
+    });
+  })();
 
 })();
