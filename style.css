@@ -145,10 +145,15 @@ section[id] {
   gap: 0.6rem;
   text-decoration: none;
 }
-.brand-mark { width: 2rem; height: 2rem; flex: none; }
-.mark-bg   { fill: var(--brand-deep); }
-.mark-step { fill: rgba(255, 255, 255, 0.45); }
-.step-on   { fill: var(--gold); }
+.brand-mark {
+  width: 2rem;
+  height: 2rem;
+  flex: none;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--line);
+  object-fit: cover;
+}
 .brand-name {
   font-family: var(--font-display);
   font-weight: 800;
